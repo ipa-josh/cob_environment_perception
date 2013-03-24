@@ -9,10 +9,11 @@
 #define FT_MAP_H_
 
 #include <kdtree++/kdtree.hpp>
+#include "context.h"
 
 namespace cob_3d_feature_map {
 
-  template <typename Feature>
+  template <typename Feature, class View = std::vector<Feature> >
   class Tree_Feature {
 
     typedef KDTree::KDTree<Feature::DIMENSION, SmartNode<Feature> > treeType;
@@ -25,7 +26,8 @@ namespace cob_3d_feature_map {
       tree_.insert(ft);
     }
 
-    void find(const std::vector<Feature> &view) {
+    void find(const View &view) {
+      ContextAcitivity<typename Feature::RT::CTXT, typename Feature::RT, typename Feature::ID, View> act;
 
         for(size_t i=0; i<view.size(); i++) {
           std::vector<Feature> result;

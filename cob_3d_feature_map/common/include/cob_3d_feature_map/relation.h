@@ -15,8 +15,12 @@ namespace cob_3d_feature_map {
 
   template<int n>
   class RelationDistribution {
-    typedef Eigen::Matrix<float, n, 1>    VectorU;
-    typedef Eigen::Matrix<float, n, n>    MatrixU;
+  public:
+    typedef float value_type;
+
+  private:
+    typedef Eigen::Matrix<value_type, n, 1>    VectorU;
+    typedef Eigen::Matrix<value_type, n, n>    MatrixU;
 
     bool computed_;
     size_t size_;
@@ -38,6 +42,27 @@ namespace cob_3d_feature_map {
     VectorU getEigenvalues() const {if(!computed_) compute(); return eigenvalues_;}
     MatrixU getEigenvectors() const {if(!computed_) compute(); return eigenvectors_;}
 
+    value_type operator[](size_t i) const
+    {
+      return getEigenvalues()(i);
+    }
+  };
+
+  template <typename Relation, typename Context>
+  class RelationEnd {
+   std::vector<typename boost::shared_ptr<Context> > ctxt_;
+    Relation rel_;
+
+  public:
+
+    typedef Context CTXT;
+    typedef Relation RT;
+    typedef typename Relation::value_type value_type;
+
+    value_type operator[](size_t n) const
+    {
+      return rel_[n];
+    }
   };
 
 #include "impl/relation.hpp"

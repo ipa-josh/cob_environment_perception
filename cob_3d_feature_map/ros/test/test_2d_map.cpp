@@ -14,15 +14,25 @@
 
 using namespace cob_3d_feature_map;
 
+cob_3d_feature_map::IDHandler::ID cob_3d_feature_map::IDHandler::_sid_ = 0;
+
 namespace Map2D {
   class Instance {
   public:
+    typedef float value_type;
+    enum {DIMENSION=2};
+
     Eigen::Vector2i pos_;
-    Eigen::Matrix<float,2,1> ft_;
+    Eigen::Matrix<value_type,DIMENSION,1> ft_;
+
+    value_type operator[](size_t n) const
+    {
+      return ft_[n];
+    }
   };
 
   template<typename INST>
-  class Context {
+  class Context : public IDHandler {
     std::vector<boost::shared_ptr<INST> > insts_;
     int activity_;
   public:
@@ -52,8 +62,8 @@ namespace Map2D {
 TEST(Search, map2d)
 {
   typedef RelationEnd<RelationDistribution<2>, Map2D::Context<Map2D::Instance> > Relation;
-  typedef KDTree::KDTree<Relation::DIMENSION,Relation> RT_TREE;
-  typedef FeatureInst<Map2D::Instance, RT_TREE> FeatureInst;
+  //typedef KDTree::KDTree<Relation::RT::DIMENSION,SmartNode<Relation> > RT_TREE;
+  typedef Instance_Feature<Map2D::Instance, Relation> FeatureInst;
   typedef Tree_Feature<FeatureInst> FTMAP;
 
   FTMAP ft_map;
