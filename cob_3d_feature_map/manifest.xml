@@ -1,0 +1,17 @@
+<package>
+  <description brief="cob_3d_feature_map">
+
+     cob_3d_feature_map
+
+  </description>
+  <author>Josh</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/cob_3d_feature_map</url>
+  <depend package="roscpp"/>
+
+  <depend package="pcl"/>
+  <depend package="pcl_ros"/>
+</package>
+
+
