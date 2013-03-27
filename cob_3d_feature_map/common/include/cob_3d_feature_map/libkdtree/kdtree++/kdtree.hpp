@@ -1053,10 +1053,10 @@ namespace KDTree
                              size_type const __L) const
         {
         /*if(__N->_M_max) {
-          assert(__N->_M_max->_M_value[0]==((_Link_const_type)_Node_base::_S_maximum(__N->_M_right))->_M_value[0]);
+          assert(__N->_M_max->_M_value[__L%__K]==((_Link_const_type)_Node_base::_S_maximum(__N->_M_right))->_M_value[__L%__K]);
         }
         if(__N->_M_min) {
-          assert(__N->_M_min->_M_value[0]==((_Link_const_type)_Node_base::_S_minimum(__N->_M_left))->_M_value[0]);
+          assert(__N->_M_min->_M_value[__L%__K]==((_Link_const_type)_Node_base::_S_minimum(__N->_M_left))->_M_value[__L%__K]);
         }*/
 
           if (__REGION.encloses(_S_value(__N)))
@@ -1067,17 +1067,27 @@ namespace KDTree
             {
               _Region_ __bounds(__BOUNDS);
               __bounds.set_high_bound(_S_value(__N), __L);
-              if (__REGION.intersects_with(__bounds))
+              if (__REGION.intersects_with(__bounds)) {
+                _OutputIterator tmp = out;
                 out = _M_find_within_range(out, descr, _S_left(__N),
                                      __REGION, __bounds, __L+1);
+                while(tmp!=out) {
+                  ++tmp;
+                }
+              }
             }
           if (_S_right(__N))
             {
               _Region_ __bounds(__BOUNDS);
               __bounds.set_low_bound(_S_value(__N), __L);
-              if (__REGION.intersects_with(__bounds))
+              if (__REGION.intersects_with(__bounds)) {
+                _OutputIterator tmp = out;
                 out = _M_find_within_range(out, descr, _S_right(__N),
                                      __REGION, __bounds, __L+1);
+                while(tmp!=out) {
+                  ++tmp;
+                }
+              }
             }
 
           return out;
