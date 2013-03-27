@@ -8,7 +8,7 @@
 #ifndef FEATURE_H_
 #define FEATURE_H_
 
-#include <kdtree++/kdtree.hpp>
+#include <cob_3d_feature_map/libkdtree/kdtree++/kdtree.hpp>
 #include <boost/shared_ptr.hpp>
 #include "id.h"
 

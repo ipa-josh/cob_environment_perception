@@ -34,3 +34,6 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 rosbuild_add_executable(test_2d_map ros/test/test_2d_map.cpp)
 target_link_libraries(test_2d_map gtest)
+
+rosbuild_add_executable(test_kdtree ros/test/test_kdtree.cpp)
+target_link_libraries(test_kdtree gtest)

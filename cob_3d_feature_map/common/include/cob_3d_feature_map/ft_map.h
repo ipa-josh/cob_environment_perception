@@ -8,7 +8,7 @@
 #ifndef FT_MAP_H_
 #define FT_MAP_H_
 
-#include <kdtree++/kdtree.hpp>
+#include <cob_3d_feature_map/libkdtree/kdtree++/kdtree.hpp>
 #include "context.h"
 
 namespace cob_3d_feature_map {
