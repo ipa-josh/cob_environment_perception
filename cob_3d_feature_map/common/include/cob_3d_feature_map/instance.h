@@ -8,15 +8,17 @@
 #ifndef INSTANCE_H_
 #define INSTANCE_H_
 
+#include "descriptor.h"
 
 namespace cob_3d_feature_map {
 
-  template<typename ClusterReprsentation, typename Feature>
+  template<typename _ClusterReprsentation, typename Feature>
   class Instance
   {
   public:
     typedef boost::shared_ptr<Feature> FeaturePtr;
-    typedef Feature::Descriptor DESCRIPTOR;
+    typedef typename Feature::Descriptor DESCRIPTOR;
+    typedef _ClusterReprsentation ClusterReprsentation;
 
   protected:
     std::vector<FeaturePtr> fts_;               /// associated features
@@ -24,6 +26,21 @@ namespace cob_3d_feature_map {
     AccumulatedDescriptor<DESCRIPTOR> acc_descr_;     /// accumulated descriptor
 
   public:
+
+    Instance(const ClusterReprsentation &r):
+    	rep_(r)
+    {}
+
+    std::vector<FeaturePtr> &getFeatures()
+		{ return fts_; }
+
+    void append(const FeaturePtr &ft) {
+    	fts_.push_back(ft);
+    }
+
+    void updateDescriptor(const FeaturePtr &ft) {
+    	acc_descr_.append(ft->getDescriptor());
+    }
 
     const ClusterReprsentation &getRepresentation() const {
       return rep_;

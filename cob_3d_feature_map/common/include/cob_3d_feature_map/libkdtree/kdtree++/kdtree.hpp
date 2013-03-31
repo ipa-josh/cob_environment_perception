@@ -83,6 +83,7 @@
 #include "iterator.hpp"
 #include "node.hpp"
 #include "region.hpp"
+#include "back_insert_iterator2.hpp"
 
 namespace KDTree
 {
@@ -91,7 +92,7 @@ namespace KDTree
    unsigned long long num_dist_calcs = 0;
 #endif
 
-  template <size_t const __K, typename _Val,
+  template <typename _Val, size_t const __K=_Val::DIMENSION,
             typename _Acc = _Bracket_accessor<_Val>,
 	    typename _Dist = squared_difference<typename _Acc::result_type,
 						typename _Acc::result_type>,
@@ -1050,7 +1051,7 @@ namespace KDTree
         _M_find_within_range(_OutputIterator out, _DescriptorIterator descr,
                              _Link_const_type __N, _Region_ const& __REGION,
                              _Region_ const& __BOUNDS,
-                             size_type const __L) const
+                             size_type const __L, const bool inv=false) const
         {
         /*if(__N->_M_max) {
           assert(__N->_M_max->_M_value[__L%__K]==((_Link_const_type)_Node_base::_S_maximum(__N->_M_right))->_M_value[__L%__K]);
@@ -1059,34 +1060,82 @@ namespace KDTree
           assert(__N->_M_min->_M_value[__L%__K]==((_Link_const_type)_Node_base::_S_minimum(__N->_M_left))->_M_value[__L%__K]);
         }*/
 
+//    	  for(size_t i=0; i<__L; i++)std::cout<<"\t";
+//    	  std::cout<<_S_value(__N)[0]<<" "<<_S_value(__N)[1]<<" "<<_S_value(__N)[2]<<std::endl;
+
           if (__REGION.encloses(_S_value(__N)))
             {
               *out++ = _S_value(__N);
+      		descr.container().push_back( typename _DescriptorIterator::container_type::iterator::value_type() );
+      		descr.container().back().push_back(0.5);
             }
+//    	  for(size_t i=0; i<__L; i++)std::cout<<"\t";
+//    	  std::cout<<"left: "<<std::endl;
           if (_S_left(__N))
             {
               _Region_ __bounds(__BOUNDS);
               __bounds.set_high_bound(_S_value(__N), __L);
               if (__REGION.intersects_with(__bounds)) {
-                _OutputIterator tmp = out;
+            	  size_t p1 = out.container().size();
                 out = _M_find_within_range(out, descr, _S_left(__N),
-                                     __REGION, __bounds, __L+1);
-                while(tmp!=out) {
-                  ++tmp;
+                                     __REGION, __bounds, __L+1, false);
+                while(p1<out.container().size()) {
+                	descr.container()[p1].push_back(
+                			std::abs(
+                					(inv?1:0)-
+                					0.5*( (out.container()[p1])[__L%__K]-__N->_M_min[__L%__K]) /
+                					(typename _DescriptorIterator::container_type::iterator::value_type::iterator::value_type)
+                					(_S_value(__N)[__L%__K]-__N->_M_min[__L%__K])
+                					));
+                	if(descr.container()[p1].back()>1) {
+                		std::cout<<out.container()[p1][__L%__K]<<" "<<__N->_M_min[__L%__K]<<" "<<_S_value(__N)[__L%__K]<<std::endl;
+                		exit(0);
+                	}
+                	//assert( descr.container()[p1].back()<=1 );
+                	++p1;
                 }
               }
             }
+//    	  for(size_t i=0; i<__L; i++)std::cout<<"\t";
+//    	  std::cout<<"right: "<<std::endl;
           if (_S_right(__N))
             {
               _Region_ __bounds(__BOUNDS);
               __bounds.set_low_bound(_S_value(__N), __L);
               if (__REGION.intersects_with(__bounds)) {
-                _OutputIterator tmp = out;
+            	  size_t p1 = out.container().size();
                 out = _M_find_within_range(out, descr, _S_right(__N),
-                                     __REGION, __bounds, __L+1);
-                while(tmp!=out) {
-                  ++tmp;
-                }
+                                     __REGION, __bounds, __L+1, ((__L+1)%__K)==0);
+                while(p1<out.container().size()) {
+					descr.container()[p1].push_back(
+							std::abs(
+									(inv?1:0)-
+									(0.5+0.5*((out.container()[p1])[__L%__K] - _S_value(__N)[__L%__K]) /
+									(typename _DescriptorIterator::container_type::iterator::value_type::iterator::value_type)
+									(__N->_M_max[__L%__K]-_S_value(__N)[__L%__K])
+									)));
+					if(descr.container()[p1].back()>1) {
+						std::cout<<out.container()[p1][__L%__K]<<" "<<__N->_M_max[__L%__K]<<" "<<_S_value(__N)[__L%__K]<<std::endl;
+						exit(0);
+					}
+					//assert( descr.container()[p1].back()<=1 );
+					++p1;
+				}
+                /*size_t p=0;
+                for(typename _OutputIterator::container_type::const_iterator it=out.container().begin();
+                		it!=out.container().end();
+                		++it, ++p) {
+                	if(p>=descr.container().size())
+                		descr.container().push_back( typename _DescriptorIterator::container_type::iterator::value_type() );
+                	descr.container()[p].push_back(
+                			std::abs(
+                					(inv?1:0)-
+                					(__N->_M_max->_M_value[__L%__K]-(*it)[__L%__K]) /
+                					(typename _DescriptorIterator::container_type::iterator::value_type::iterator::value_type)
+                					(_S_value(__N)[__L%__K]-__N->_M_max->_M_value[__L%__K])
+                					));
+                	assert( descr.container()[p].back()<=1 );
+                }*/
               }
             }
 
@@ -1171,7 +1220,7 @@ namespace KDTree
       _S_set_left(_Link_type N, _Base_ptr l)
       {
         N->_M_left = l;
-        N->update_left();
+        N->update();
       }
 
       static _Link_type
@@ -1190,7 +1239,7 @@ namespace KDTree
       _S_set_right(_Link_type N, _Base_ptr r)
       {
         N->_M_right = r;
-        N->update_right();
+        N->update();
       }
 
       static _Link_type

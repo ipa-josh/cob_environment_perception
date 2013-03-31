@@ -7,7 +7,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  Release        : w/o debug symbols, w/ optimization
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-#set(ROS_BUILD_TYPE RelWithDebInfo)
+set(ROS_BUILD_TYPE Debug)
 
 rosbuild_init()
 rosbuild_check_for_sse()
@@ -35,5 +35,5 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 rosbuild_add_executable(test_2d_map ros/test/test_2d_map.cpp)
 target_link_libraries(test_2d_map gtest)
 
-rosbuild_add_executable(test_kdtree ros/test/test_kdtree.cpp)
-target_link_libraries(test_kdtree gtest)
+#rosbuild_add_executable(test_kdtree ros/test/test_kdtree.cpp)
+#target_link_libraries(test_kdtree gtest)

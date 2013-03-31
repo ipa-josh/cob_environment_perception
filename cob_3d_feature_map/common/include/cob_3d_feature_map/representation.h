@@ -33,31 +33,100 @@ namespace cob_3d_feature_map {
     Type weight_;         // weight or number of data
 
     /// simalarity with d>=0: d=0 --> equal
-    inline static float d(const MatrixU &covar1, const MatrixU &covar2) {
-      MatrixU delta = covar1-covar2;
-      Eigen::SelfAdjointEigenSolver<MatrixU> es(delta);
-      Type d=0.f;
+    inline static Type d(const MatrixU &covar1, const MatrixU &covar2) {
+    	/*Eigen::SelfAdjointEigenSolver<MatrixU> es1(covar1, Eigen::EigenvaluesOnly);
+    	Eigen::SelfAdjointEigenSolver<MatrixU> es2(covar2, Eigen::EigenvaluesOnly);
+
+    	const Type a = es1.eigenvalues().dot(es1.eigenvalues()), b = es2.eigenvalues().dot(es2.eigenvalues());
+    	Type d = std::sqrt( std::max(a,b) / std::min(a,b))-1;
+
+        /*std::cout<<es1.eigenvalues()<<std::endl;
+        std::cout<<es2.eigenvalues()<<std::endl;
+        std::cout<<"d: "<<d<<std::endl;*//*
+
+        return d;*/
+
+//      MatrixU delta = covar2.llt().solve(covar1);// = covar1*covar2.inverse(); //TODO: for higher degree use LLT
+      Eigen::GeneralizedSelfAdjointEigenSolver<MatrixU> es(covar1,covar2,Eigen::EigenvaluesOnly|Eigen::Ax_lBx);
+      //Eigen::SelfAdjointEigenSolver<MatrixU> es(delta,Eigen::EigenvaluesOnly);
+      Type d=0;//std::numeric_limits<Type>::max();
       for(size_t i=0; i<Dimension; i++)
-        d += std::pow(std::ln(es.eigenvalues()(i)),2);
-      return d;
+        d += std::pow(std::log(std::abs(es.eigenvalues()(i))),2);
+      /*std::cout<<covar1<<std::endl;
+      std::cout<<covar2<<std::endl;
+      //std::cout<<covar2.inverse()<<std::endl;
+      //std::cout<<es.eigenvectors()<<std::endl;
+      std::cout<<es.eigenvalues()<<std::endl;
+      std::cout<<"d: "<<d<<std::endl;*/
+      return std::sqrt(d);
+    }
+
+    inline static Type d2(const MatrixU &covar1, const MatrixU &covar2) {
+    	Eigen::SelfAdjointEigenSolver<MatrixU> es(covar1*covar2.inverse(), Eigen::EigenvaluesOnly);
+
+    	Type d=0;//std::numeric_limits<Type>::max();
+      for(size_t i=0; i<Dimension; i++)
+        d += std::pow(std::log(std::abs(es.eigenvalues()(i))),2);
+      /*std::cout<<covar1<<std::endl;
+      std::cout<<covar2<<std::endl;
+      //std::cout<<covar2.inverse()<<std::endl;
+      //std::cout<<es.eigenvectors()<<std::endl;
+      std::cout<<es.eigenvalues()<<std::endl;
+      std::cout<<"d: "<<d<<std::endl;*/
+      return std::sqrt(d);
     }
 
   public:
+    ClusterReprsentation():tmp_covar_(MatrixU::Zero()), mean_(VectorU::Zero()), weight_(0)
+    {}
+
+    inline void operator+=(const VectorU &o) {
+    	const Type w = 1;
+        weight_ += w;
+        const Type a = w/weight_;
+      tmp_covar_ = (1-a)*tmp_covar_ + a*(o*o.transpose());
+      mean_ = (1-a)*mean_ + a*o;
+    }
 
     inline void operator+=(const ClusterReprsentation &o) {
-      const Type a = weight_/(weight_ + o.weight_), b = o.weight_/(weight_ + o.weight_);
-      tmp_covar_ = a*tmp_covar_ + b*o.tmp_covar_;
-      mean_  = a* mean_ + b* o.mean_;
+        const Type a = o.weight_/(o.weight_+weight_);
+      if(a!=a || o.weight_==0) return;
       weight_ += o.weight_;
+      tmp_covar_ = (1-a)*tmp_covar_ + a*o.tmp_covar_;
+      mean_ = (1-a)*mean_ + a*o.mean_;
+    }
+
+    inline ClusterReprsentation operator*(const ClusterReprsentation &o) const {
+    	ClusterReprsentation r = *this;
+      r.weight_ *= o.weight_;
+      r.tmp_covar_ = getCoVar() - (getCoVar()*getCoVar())*(getCoVar()+o.getCoVar()).inverse();
+      r.mean_ += getCoVar()*(getCoVar()+o.getCoVar()).inverse()*(o.mean_-mean_);
+      return r;
+    }
+
+    inline ClusterReprsentation operator*(const Type &f) const {
+    	ClusterReprsentation r = *this;
+    	r.tmp_covar_*=f;
+    	r.mean_*=f;
+    	r.weight_*=f;
+    	return r;
     }
 
     /// p: [0,1]
     inline Type cmp(const ClusterReprsentation &o) const {
-      return 1/std::ln(d(getCoVar(), o.getCoVar())+1);
+      return 1/(std::log(d(getCoVar(), o.getCoVar())+1)+1);
+    }
+
+    inline Type cmp2(const ClusterReprsentation &o, const ClusterReprsentation &r1, const ClusterReprsentation &r2) const {
+      return 1/(std::log(d2(getCoVar()*r1.getCoVar().inverse(), o.getCoVar()*r2.getCoVar().inverse())+1)+1);
     }
 
     inline MatrixU getCoVar() const {
-      return covar1 - mean_*mean_.transpose();
+      return tmp_covar_ - mean_*mean_.transpose();
+    }
+
+    inline VectorU getMean() const {
+      return mean_;
     }
 
     inline Type getWeight() const {

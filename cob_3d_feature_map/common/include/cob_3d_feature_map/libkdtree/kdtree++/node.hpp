@@ -52,41 +52,31 @@ namespace KDTree
       typedef _Node* _Link_type;
 
       _Val _M_value;
-      _Link_type _M_min, _M_max;
+      _Val _M_min, _M_max;
 
       _Node(_Val const& __VALUE = _Val(),
             _Base_ptr const __PARENT = NULL,
             _Base_ptr const __LEFT = NULL,
             _Base_ptr const __RIGHT = NULL)
-        : _Node_base(__PARENT, __LEFT, __RIGHT), _M_value(__VALUE), _M_min((_Link_type)__LEFT), _M_max((_Link_type)__RIGHT) {
-        update_left();
-        update_right();
+        : _Node_base(__PARENT, __LEFT, __RIGHT), _M_value(__VALUE), _M_min(__VALUE), _M_max(__VALUE) {
+        update();
       }
 
-      inline void update_left() {
-        if(_M_left)
-          _M_min = ((_Link_type)_S_minimum(_M_left ));
-        if(_M_min) set_parent_min();
-      }
+      inline void update() {
+    	  for(size_t i=0; i<_Val::DIMENSION; i++)
+    	  {
+    		  _M_min[i] = std::min(_M_value[i],_M_min[i]);
+    		  _M_max[i] = std::max(_M_value[i],_M_max[i]);
+    		  if(_M_left) {
+    		  _M_min[i] = std::min(((_Link_type)_M_left)->_M_min[i],_M_min[i]);
+    		  _M_max[i] = std::max(((_Link_type)_M_left)->_M_max[i],_M_max[i]);}
+    		  if(_M_right) {
+    		  _M_min[i] = std::min(((_Link_type)_M_right)->_M_min[i],_M_min[i]);
+    		  _M_max[i] = std::max(((_Link_type)_M_right)->_M_max[i],_M_max[i]);}
+    	  }
 
-      inline void update_right() {
-        if(_M_right)
-          _M_max = ((_Link_type)_S_maximum(_M_right));
-        if(_M_max) set_parent_max();
-      }
-
-      inline void set_parent_min() {
-        if(_M_parent && _M_parent->_M_left==this) {
-          ((_Link_type)_M_parent)->_M_min = _M_min;
-          ((_Link_type)_M_parent)->set_parent_min();
-        }
-      }
-
-      inline void set_parent_max() {
-        if(_M_parent && _M_parent->_M_right==this) {
-          ((_Link_type)_M_parent)->_M_max = _M_max;
-          ((_Link_type)_M_parent)->set_parent_max();
-        }
+    	  if(_M_parent)
+    		  ((_Link_type)_M_parent)->update();
       }
 
 #ifdef KDTREE_DEFINE_OSTREAM_OPERATORS

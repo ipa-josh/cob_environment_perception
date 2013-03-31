@@ -22,17 +22,21 @@ namespace cob_3d_feature_map {
 
   public:
 
-    inline Type weight(const size_t ind, const int code) {
+    inline Type weight(const size_t ind, const int code) const {
       if(ind>=descr_.size())
         return 0;
-      return (code%2)-descr_[ind];
+      return (code?1:-1)*((code%2)-descr_[ind]);
     }
 
     inline void append(const Type &c) {
       descr_.push_back(c);
     }
 
-    friend AccumulatedDescriptor<Descriptor<Type, Codes> >;
+    template<typename Descriptor>
+    friend class AccumulatedDescriptor;
+
+    template <typename Content, size_t const Dimension, typename _Type>
+    friend class Feature_kdtree;
   };
 
   template<typename Descriptor>
@@ -42,13 +46,15 @@ namespace cob_3d_feature_map {
 
   public:
 
-    inline Descriptor::TYPE weight(const size_t ind, const int code) {
-      if(ind>=descr_.size())
-        return 0;
-      Descriptor::TYPE w=0;
+    inline typename Descriptor::TYPE weight(const size_t ind, const int code) const {
+      typename Descriptor::TYPE w=0;
+      size_t n = 0;
       for(size_t i=0; i<acc_descr_.size(); i++)
-        w += acc_descr_[i].weight(ind,code);
-      return w/acc_descr_.size();
+        if(ind<acc_descr_[i].descr_.size()) {
+        	w += acc_descr_[i].weight(ind,code);
+        	++n;
+        }
+      return n?w/n:0;
     }
 
     inline void append(const Descriptor &d) {

@@ -17,11 +17,17 @@ using namespace std;
 struct kdtreeNode
 {
   typedef double value_type;
+  enum {DIMENSION=3};
 
   double xyz[3];
   size_t index;
 
-  value_type operator[](size_t n) const
+  const value_type &operator[](size_t n) const
+  {
+    return xyz[n];
+  }
+
+  value_type &operator[](size_t n)
   {
     return xyz[n];
   }
@@ -46,12 +52,12 @@ TEST(kdtree, kdtree)
 {
   vector<kdtreeNode> pts;
 
-  typedef KDTree::KDTree<3,kdtreeNode> treeType;
+  typedef KDTree::KDTree<kdtreeNode> treeType;
 
   treeType tree;
 
   // make random 3d points
-  for ( size_t n = 0; n < 10000; ++n)
+  for ( size_t n = 0; n < 100; ++n)
   {
     kdtreeNode node;
     node.xyz[0] = double(rand())/RAND_MAX;
@@ -85,11 +91,16 @@ TEST(kdtree, kdtree)
     // now do the same with the kdtree.
     vector<kdtreeNode> howClose;
     vector< vector<float> > descr;
-    tree.find_within_range(refNode,limit,back_insert_iterator<vector<kdtreeNode> >(howClose),back_insert_iterator<vector<vector<float> > >(descr));
+    tree.find_within_range(refNode,limit,back_insert_iterator2<vector<kdtreeNode> >(howClose),back_insert_iterator2<vector<vector<float> > >(descr));
 
-    //assert(descr.size()==howClose.size());
+    assert(descr.size()==howClose.size());
 
     std::cout<<"depth "<<descr.size()<<std::endl;
+    for(size_t i=0; i<descr.size(); i++) {
+    	std::cout<<"s: "<<descr[i].size()<<std::endl;
+    	for(size_t j=0; j<descr[i].size(); j++)
+    		std::cout<<descr[i][j]<<std::endl;
+    }
 
     // make sure no extra points are returned, and the return has no missing points.
     for ( size_t i = 0; i < howClose.size(); ++i)
