@@ -18,6 +18,7 @@
 #include <cob_3d_feature_map/feature.h>
 #include <cob_3d_feature_map/instance.h>
 #include <cob_3d_feature_map/haar.h>
+#include <cob_3d_feature_map/correspondence.h>
 
 using namespace std;
 
