@@ -11,18 +11,19 @@
 
 namespace cob_3d_feature_map {
 
-template<typename Cluster, typename Type>
-size_t haar_wavelet(std::vector<Type> &prob_result, const std::vector<boost::shared_ptr<Cluster> > &hotspots, const Cluster &input, const Type thr, const Type thr_term=0.8)
+template<typename ClusterSummarizer, typename Type>
+size_t haar_wavelet(std::vector<Type> &prob_result, const std::vector<ClusterSummarizer> &hotspots, const ClusterSummarizer &input, const Type thr, const Type thr_term=0.8)
 {
+  typedef typename ClusterSummarizer::element_type Cluster;
 #ifdef CMP2
 	std::vector<typename Cluster::ClusterReprsentation> dep_rep;
-	typename Cluster::ClusterReprsentation dep_rep_cmp = input.getRepresentation();
+	typename Cluster::ClusterReprsentation dep_rep_cmp = input->getRepresentation();
 #endif
 	prob_result.resize(hotspots.size());
 
 	size_t num = 0, ind=0;
 	for(size_t i=0; i<hotspots.size(); i++) {
-		Type p = hotspots[i]->cmp(input);
+		Type p = hotspots[i]->cmp(*input);
 		if(p!=p) p=0;
 
 #ifdef CMP2
@@ -45,7 +46,7 @@ size_t haar_wavelet(std::vector<Type> &prob_result, const std::vector<boost::sha
 		std::cout<<"found: "<<num<<std::endl;
 
 		std::vector<typename Cluster::ClusterReprsentation> rep;
-		if(input.split_all(D_ind, rep)<thr_term) break;
+		if(input->split_all(D_ind, rep)<thr_term) break;
 
 #ifdef CMP2
 		{
@@ -63,15 +64,15 @@ size_t haar_wavelet(std::vector<Type> &prob_result, const std::vector<boost::sha
 			sprintf(fn,"/tmp/haarCMP_%d.svg",(int)D_ind);
 			FILE *fp=fopen(fn,"w");
 			fputs("<?xml version=\"1.0\" ?><svg width=\"200\" height=\"200\">",fp);
-			for(size_t ji=0; ji<input.getInstances().size(); ji++)
+			for(size_t ji=0; ji<input->getInstances().size(); ji++)
 			{
 				sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" fill=\"rgb(%d,%d,0)\" /><text x=\"%f\" y=\"%f\">%f</text>",
-						input.getInstances()[ji]->getRepresentation().getMean()(0)*20 + 344/100.f,
-						input.getInstances()[ji]->getRepresentation().getMean()(1)*20 + 344/100.f,
-						(int)(input.getInstances()[ji]->getAccDescr().weight(D_ind,0)*255),(int)(input.getInstances()[ji]->getAccDescr().weight(D_ind,0)*255),
-						input.getInstances()[ji]->getRepresentation().getMean()(0)*20 + 344/100.f,
-						input.getInstances()[ji]->getRepresentation().getMean()(1)*20 + 344/100.f,
-						(*input.getInstances()[ji]->getFeatures()[0])[D_ind%2]);
+						input->getInstances()[ji]->getRepresentation().getMean()(0)*20 + 344/100.f,
+						input->getInstances()[ji]->getRepresentation().getMean()(1)*20 + 344/100.f,
+						(int)(input->getInstances()[ji]->getAccDescr().weight(D_ind,0)*255),(int)(input->getInstances()[ji]->getAccDescr().weight(D_ind,0)*255),
+						input->getInstances()[ji]->getRepresentation().getMean()(0)*20 + 344/100.f,
+						input->getInstances()[ji]->getRepresentation().getMean()(1)*20 + 344/100.f,
+						(*input->getInstances()[ji]->getFeatures()[0])[D_ind%2]);
 				fputs(fn,fp);
 			}
 			fputs("</svg>",fp);
@@ -105,7 +106,7 @@ size_t haar_wavelet(std::vector<Type> &prob_result, const std::vector<boost::sha
 				fclose(fp);
 			}
 
-			Type p = hotspots[i]->cmp_split(rep, D_ind, input.getRepresentation());
+			Type p = hotspots[i]->cmp_split(rep, D_ind, input->getRepresentation());
 			if(p!=p) p=0;
 
 #ifdef CMP2

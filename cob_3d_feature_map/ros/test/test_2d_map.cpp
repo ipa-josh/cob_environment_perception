@@ -39,9 +39,10 @@ TEST(ft_map, test_2d)
 	typedef cob_3d_feature_map::ClusterReprsentation<2> CR;
 	typedef cob_3d_feature_map::Instance<CR, FT> INST;
 	typedef cob_3d_feature_map::Cluster<INST> CL;
+	typedef cob_3d_feature_map::CorrespondenceFinding::Correspondence<FT, CR> COR;
+	typedef cob_3d_feature_map::CorrespondenceSet<CL,COR> COR_SET;
 
 	vector<boost::shared_ptr<CL> > clusters;
-	boost::shared_ptr<CL> search_cluster;
 
 	typedef KDTree::KDTree<FT> treeType;
 	treeType tree;
@@ -165,11 +166,16 @@ TEST(ft_map, test_2d)
 		fclose(fp);
 	}
 
-	search_cluster = clusters[100];
+        //boost::shared_ptr<CL> search_cluster;
+	//search_cluster = clusters[100];
+	COR_SET search_cluster(clusters[100]);
 	clusters.resize(100);
 
+	std::vector<COR_SET> sets;
 	std::vector<float> result;
-	size_t p = cob_3d_feature_map::haar_wavelet(result, vector<boost::shared_ptr<CL> >(clusters.begin()+0,clusters.end()), *search_cluster, 0.7f);
+	for(vector<boost::shared_ptr<CL> >::const_iterator it = clusters.begin()+0; it!=clusters.end(); ++it)
+	  sets.push_back( COR_SET(*it) );
+	size_t p = cob_3d_feature_map::haar_wavelet(result, sets, search_cluster, 0.7f);
 
 	for(size_t i=0; i<result.size(); i++)
 		std::cout<<"R: "<<result[i]<<std::endl;
