@@ -118,7 +118,9 @@ namespace cob_3d_feature_map {
     }
 
     inline Type cmp2(const ClusterReprsentation &o, const ClusterReprsentation &r1, const ClusterReprsentation &r2) const {
-      return 1/(std::log(d2(getCoVar()*r1.getCoVar().inverse(), o.getCoVar()*r2.getCoVar().inverse())+1)+1);
+      const Type dist1 = d2(getCoVar()*r1.getCoVar().inverse(), o.getCoVar()*r2.getCoVar().inverse());
+      const Type dist2 = std::pow(std::log(std::sqrt( (mean_-r1.mean_).squaredNorm()/(o.mean_-r2.mean_).squaredNorm() )),2);;
+      return 1/(std::log(dist1+dist2+1)+1);
     }
 
     inline MatrixU getCoVar() const {
