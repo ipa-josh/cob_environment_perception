@@ -53,7 +53,7 @@ void simulate_scan(const float a1, float a2, const int x, const int y, const uns
       }
     }
 
-    if(v>100) v = std::numeric_limits<float>::max();
+    if(v>100) v = std::numeric_limits<float>::quiet_NaN();
     scan[i] = v;
     scan2[i]= s2;
     ++i;
@@ -82,7 +82,7 @@ void generate_ft(const std::vector<float> &scan, std::vector<FT> &fts)
       v(1)=d;
       v(2)=d*d;
       Eigen::Matrix3f M = v*v.transpose();
-      v(0) *= scan[ind];
+      v *= scan[ind];
 
       sum_v += v;
       sum_M += M;
