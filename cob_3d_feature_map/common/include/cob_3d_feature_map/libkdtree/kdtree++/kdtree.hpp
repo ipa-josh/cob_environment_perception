@@ -498,13 +498,21 @@ namespace KDTree
 
       template <typename SearchVal, typename _OutputIterator, typename _DescriptorIterator>
         _OutputIterator
-        find_within_range(SearchVal const& val, subvalue_type const range,
+        find_within_range_ex(SearchVal const& val, subvalue_type const range,
                           _OutputIterator out, _DescriptorIterator descr) const
         {
           if (!_M_get_root()) return out;
           _Region_ region(val, range, _M_acc, _M_cmp);
-          return this->find_within_range(region, out, descr);
+          return this->find_within_range_ex(region, out, descr);
         }
+
+      template <class SearchVal, typename _DescriptorIterator>
+      const_iterator
+      find_exact_ex(SearchVal const& __V, _DescriptorIterator descr) const
+      {
+        if (!_M_get_root()) return this->end();
+        return _M_find_exact_ex(_M_get_root(), __V, 0, descr);
+      }
 
       template <typename _OutputIterator>
         _OutputIterator
@@ -522,13 +530,13 @@ namespace KDTree
 
       template <typename _OutputIterator, typename _DescriptorIterator>
         _OutputIterator
-        find_within_range(_Region_ const& region,
+        find_within_range_ex(_Region_ const& region,
                           _OutputIterator out, _DescriptorIterator descr) const
         {
           if (_M_get_root())
             {
               _Region_ bounds(region);
-              out = _M_find_within_range(out, descr, _M_get_root(),
+              out = _M_find_within_range_ex(out, descr, _M_get_root(),
                                    region, bounds, 0);
             }
           return out;
@@ -1046,9 +1054,65 @@ namespace KDTree
           return out;
         }
 
+      template <typename _DescriptorIterator>
+      const_iterator
+      _M_find_exact_ex(_Link_const_type node, const_reference value, size_type const level, _DescriptorIterator descr, const bool inv=false) const
+      {
+         // be aware! This is very different to normal binary searches, because of the <=
+         // relationship used. See top for notes.
+         // Basically we have to check ALL branches, as we may have an identical node
+         // in different branches.
+          const_iterator found = this->end();
+
+          _Node_compare_ compare(level % __K, _M_acc, _M_cmp);
+        if (!compare(node->_M_value,value))  // note, this is a <= test
+        {
+           // this line is the only difference between _M_find_exact() and _M_find()
+            if (value == *const_iterator(node)) {
+              descr.container().push_back( typename _DescriptorIterator::container_type::iterator::value_type() );
+              descr.container().back().push_back(0.5);
+              return const_iterator(node);   // return right away
+            }
+           if (_S_left(node)) {
+            found = _M_find_exact_ex(_S_left(node), value, level+1, descr, false);
+            if(found!=this->end()) {
+              descr.container()[0].push_back(
+                              std::abs(
+                                              (inv?1:0)-
+                                              0.5*( (*found)[level%__K]-node->_M_min[level%__K]) /
+                                              (typename _DescriptorIterator::container_type::iterator::value_type::iterator::value_type)
+                                              (_S_value(node)[level%__K]-node->_M_min[level%__K])
+                                              ));
+              if(descr.container()[0].back()!=descr.container()[0].back())
+                descr.container()[0].back() = 0.5;
+              assert(descr.container()[0].back()==descr.container()[0].back());
+            }
+           }
+        }
+
+        // note: no else!  items that are identical can be down both branches
+        if ( _S_right(node) && found == this->end() && !compare(value,node->_M_value))   // note, this is a <= test
+        {
+            found = _M_find_exact_ex(_S_right(node), value, level+1, descr, false);
+            if(found!=this->end()) {
+              descr.container()[0].push_back(
+                  std::abs(
+                      (inv?1:0)-
+                      (0.5+0.5*((*found)[level%__K] - _S_value(node)[level%__K]) /
+                          (typename _DescriptorIterator::container_type::iterator::value_type::iterator::value_type)
+                          (node->_M_max[level%__K]-_S_value(node)[level%__K])
+                      )));
+              if(descr.container()[0].back()!=descr.container()[0].back())
+                descr.container()[0].back() = 0.5;
+              assert(descr.container()[0].back()==descr.container()[0].back());
+            }
+        }
+        return found;
+      }
+
       template <typename _OutputIterator,typename _DescriptorIterator>
         _OutputIterator
-        _M_find_within_range(_OutputIterator out, _DescriptorIterator descr,
+        _M_find_within_range_ex(_OutputIterator out, _DescriptorIterator descr,
                              _Link_const_type __N, _Region_ const& __REGION,
                              _Region_ const& __BOUNDS,
                              size_type const __L, const bool inv=false) const
@@ -1060,24 +1124,20 @@ namespace KDTree
           assert(__N->_M_min->_M_value[__L%__K]==((_Link_const_type)_Node_base::_S_minimum(__N->_M_left))->_M_value[__L%__K]);
         }*/
 
-//    	  for(size_t i=0; i<__L; i++)std::cout<<"\t";
-//    	  std::cout<<_S_value(__N)[0]<<" "<<_S_value(__N)[1]<<" "<<_S_value(__N)[2]<<std::endl;
-
           if (__REGION.encloses(_S_value(__N)))
             {
-              *out++ = _S_value(__N);
-      		descr.container().push_back( typename _DescriptorIterator::container_type::iterator::value_type() );
-      		descr.container().back().push_back(0.5);
+            *out++ = _S_value(__N);
+            descr.container().push_back( typename _DescriptorIterator::container_type::iterator::value_type() );
+            descr.container().back().push_back(0.5);
             }
-//    	  for(size_t i=0; i<__L; i++)std::cout<<"\t";
-//    	  std::cout<<"left: "<<std::endl;
+
           if (_S_left(__N))
             {
               _Region_ __bounds(__BOUNDS);
               __bounds.set_high_bound(_S_value(__N), __L);
               if (__REGION.intersects_with(__bounds)) {
             	  size_t p1 = out.container().size();
-                out = _M_find_within_range(out, descr, _S_left(__N),
+                out = _M_find_within_range_ex(out, descr, _S_left(__N),
                                      __REGION, __bounds, __L+1, false);
                 while(p1<out.container().size()) {
                 	descr.container()[p1].push_back(
@@ -1087,11 +1147,6 @@ namespace KDTree
                 					(typename _DescriptorIterator::container_type::iterator::value_type::iterator::value_type)
                 					(_S_value(__N)[__L%__K]-__N->_M_min[__L%__K])
                 					));
-                	if(descr.container()[p1].back()>1) {
-                		std::cout<<out.container()[p1][__L%__K]<<" "<<__N->_M_min[__L%__K]<<" "<<_S_value(__N)[__L%__K]<<std::endl;
-                		exit(0);
-                	}
-                	//assert( descr.container()[p1].back()<=1 );
                 	++p1;
                 }
               }
@@ -1100,43 +1155,23 @@ namespace KDTree
 //    	  std::cout<<"right: "<<std::endl;
           if (_S_right(__N))
             {
-              _Region_ __bounds(__BOUNDS);
-              __bounds.set_low_bound(_S_value(__N), __L);
-              if (__REGION.intersects_with(__bounds)) {
-            	  size_t p1 = out.container().size();
-                out = _M_find_within_range(out, descr, _S_right(__N),
-                                     __REGION, __bounds, __L+1, ((__L+1)%__K)==0);
-                while(p1<out.container().size()) {
-					descr.container()[p1].push_back(
-							std::abs(
-									(inv?1:0)-
-									(0.5+0.5*((out.container()[p1])[__L%__K] - _S_value(__N)[__L%__K]) /
-									(typename _DescriptorIterator::container_type::iterator::value_type::iterator::value_type)
-									(__N->_M_max[__L%__K]-_S_value(__N)[__L%__K])
-									)));
-					if(descr.container()[p1].back()>1) {
-						std::cout<<out.container()[p1][__L%__K]<<" "<<__N->_M_max[__L%__K]<<" "<<_S_value(__N)[__L%__K]<<std::endl;
-						exit(0);
-					}
-					//assert( descr.container()[p1].back()<=1 );
-					++p1;
-				}
-                /*size_t p=0;
-                for(typename _OutputIterator::container_type::const_iterator it=out.container().begin();
-                		it!=out.container().end();
-                		++it, ++p) {
-                	if(p>=descr.container().size())
-                		descr.container().push_back( typename _DescriptorIterator::container_type::iterator::value_type() );
-                	descr.container()[p].push_back(
-                			std::abs(
-                					(inv?1:0)-
-                					(__N->_M_max->_M_value[__L%__K]-(*it)[__L%__K]) /
-                					(typename _DescriptorIterator::container_type::iterator::value_type::iterator::value_type)
-                					(_S_value(__N)[__L%__K]-__N->_M_max->_M_value[__L%__K])
-                					));
-                	assert( descr.container()[p].back()<=1 );
-                }*/
+            _Region_ __bounds(__BOUNDS);
+            __bounds.set_low_bound(_S_value(__N), __L);
+            if (__REGION.intersects_with(__bounds)) {
+              size_t p1 = out.container().size();
+              out = _M_find_within_range_ex(out, descr, _S_right(__N),
+                                         __REGION, __bounds, __L+1, ((__L+1)%__K)==0);
+              while(p1<out.container().size()) {
+                descr.container()[p1].push_back(
+                    std::abs(
+                        (inv?1:0)-
+                        (0.5+0.5*((out.container()[p1])[__L%__K] - _S_value(__N)[__L%__K]) /
+                            (typename _DescriptorIterator::container_type::iterator::value_type::iterator::value_type)
+                            (__N->_M_max[__L%__K]-_S_value(__N)[__L%__K])
+                        )));
+                ++p1;
               }
+            }
             }
 
           return out;

@@ -54,8 +54,9 @@ namespace cob_3d_feature_map {
     ClusterReprsentation split(const size_t ind, const int code) const //-->p[0,1]
     {
       ClusterReprsentation r;
-      for(size_t j=0; j<instances_.size(); j++)
+      for(size_t j=0; j<instances_.size(); j++) {
         r += instances_[j]->getRepresentation() * instances_[j]->getAccDescr().weight(ind, code);
+      }
       return r;
     }
 

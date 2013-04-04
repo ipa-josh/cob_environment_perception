@@ -40,7 +40,7 @@ namespace cob_3d_feature_map {
     	const Type a = es1.eigenvalues().dot(es1.eigenvalues()), b = es2.eigenvalues().dot(es2.eigenvalues());
     	Type d = std::sqrt( std::max(a,b) / std::min(a,b))-1;
 
-        /*std::cout<<es1.eigenvalues()<<std::endl;
+        / *std::cout<<es1.eigenvalues()<<std::endl;
         std::cout<<es2.eigenvalues()<<std::endl;
         std::cout<<"d: "<<d<<std::endl;*//*
 
@@ -119,14 +119,29 @@ namespace cob_3d_feature_map {
 
     inline Type cmp2(const ClusterReprsentation &o, const ClusterReprsentation &r1, const ClusterReprsentation &r2) const {
       const Type dist1 = d2(getCoVar()*r1.getCoVar().inverse(), o.getCoVar()*r2.getCoVar().inverse());
-      const Type dist2 = std::pow(std::log(std::sqrt( (mean_-r1.mean_).squaredNorm()/(o.mean_-r2.mean_).squaredNorm() )),2);;
+      const Type dist2 = std::pow(std::log(std::sqrt( (mean_-r1.mean_).squaredNorm()/(o.mean_-r2.mean_).squaredNorm() )),2);
       return 1/(std::log(dist1+dist2+1)+1);
     }
 
     inline Type cmp3(const ClusterReprsentation &o, const ClusterReprsentation &r1, const ClusterReprsentation &r2) const {
-      const Type d1 = (  getMean()-r1.getMean()).norm();
+      /*const Type d1 = (  getMean()-r1.getMean()).norm();
       const Type d2 = (o.getMean()-r2.getMean()).norm();
-      return std::min(d1,d2)/std::max(d1,d2);   //TODO:
+      return std::min(d1,d2)/std::max(d1,d2);   //TODO:*/
+
+      const VectorU delta1 = (  getMean()-r1.getMean());
+      const VectorU delta2 = (o.getMean()-r2.getMean());
+
+      const Type dn1 = delta1.norm();
+      const Type dn2 = delta2.norm();
+
+      const Type d11 = (   getCoVar()*delta1/dn1).norm();
+      const Type d12 = (r1.getCoVar()*delta1/dn1).norm();
+
+      const Type d21 = ( o.getCoVar()*delta2/dn2).norm();
+      const Type d22 = (r2.getCoVar()*delta2/dn2).norm();
+
+      const Type d = std::sqrt(std::max(d11,d21)) + std::sqrt(std::min(d12,d22));
+      return (std::exp( std::pow( (dn1-dn2)/d ,2)/-2 ));// / (std::sqrt(2*M_PI) * d);
     }
 
     inline MatrixU getCoVar() const {
