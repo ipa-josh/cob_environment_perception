@@ -24,6 +24,7 @@ namespace cob_3d_feature_map {
     typedef boost::shared_ptr<Instance> InstacePtr;
     typedef typename Instance::ClusterReprsentation ClusterReprsentation;
     typedef typename ClusterReprsentation::TYPE TYPE;
+    typedef Instance INSTANCE;
 
   private:
     std::vector<InstacePtr> instances_;                         /// instances of the cluster
@@ -48,19 +49,6 @@ namespace cob_3d_feature_map {
     TYPE cmp(const Cluster &o) const //-->p[0,1]
     {
       return rep_.cmp(o.rep_);
-    }
-
-    TYPE cmp_split(const std::vector<ClusterReprsentation> &o, const size_t ind, const ClusterReprsentation &r2) const //-->p[0,1]
-    {
-      TYPE p=0, w=0;
-      for(int i=0; i<Instance::DESCRIPTOR::CODES; i++) {
-        ClusterReprsentation r = split(ind, i);
-        TYPE t = std::sqrt( (r.getWeight()+o[i].getWeight())/2 );
-        //p += t * r.cmp(o[i]);
-        p += t * r.cmp2(o[i],rep_,r2);
-        w += t;
-      }
-      return p/w;
     }
 
     ClusterReprsentation split(const size_t ind, const int code) const //-->p[0,1]

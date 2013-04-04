@@ -123,6 +123,12 @@ namespace cob_3d_feature_map {
       return 1/(std::log(dist1+dist2+1)+1);
     }
 
+    inline Type cmp3(const ClusterReprsentation &o, const ClusterReprsentation &r1, const ClusterReprsentation &r2) const {
+      const Type d1 = (  getMean()-r1.getMean()).norm();
+      const Type d2 = (o.getMean()-r2.getMean()).norm();
+      return std::min(d1,d2)/std::max(d1,d2);   //TODO:
+    }
+
     inline MatrixU getCoVar() const {
       return tmp_covar_ - mean_*mean_.transpose();
     }
