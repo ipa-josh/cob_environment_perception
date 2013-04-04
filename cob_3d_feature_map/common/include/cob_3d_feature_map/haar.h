@@ -8,6 +8,8 @@
 #ifndef HAAR_H_
 #define HAAR_H_
 
+//#define REWORK(x) (x*20 + 344/100.f)
+#define REWORK(x) (x*2.f+10)
 
 namespace cob_3d_feature_map {
 
@@ -99,11 +101,11 @@ namespace cob_3d_feature_map {
         for(size_t ji=0; ji<input->getInstances().size(); ji++)
         {
           sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" fill=\"rgb(%d,%d,0)\" /><text x=\"%f\" y=\"%f\">%f</text>",
-                  input->getInstances()[ji]->getRepresentation().getMean()(0)*20 + 344/100.f,
-                  input->getInstances()[ji]->getRepresentation().getMean()(1)*20 + 344/100.f,
+                  REWORK(input->getInstances()[ji]->getRepresentation().getMean()(0)),
+                  REWORK(input->getInstances()[ji]->getRepresentation().getMean()(1)),
                   (int)(input->getInstances()[ji]->getAccDescr().weight(D_ind,0)*255),(int)(input->getInstances()[ji]->getAccDescr().weight(D_ind,0)*255),
-                  input->getInstances()[ji]->getRepresentation().getMean()(0)*20 + 344/100.f,
-                  input->getInstances()[ji]->getRepresentation().getMean()(1)*20 + 344/100.f,
+                  REWORK(input->getInstances()[ji]->getRepresentation().getMean()(0)),
+                  REWORK(input->getInstances()[ji]->getRepresentation().getMean()(1)),
                   (*input->getInstances()[ji]->getFeatures()[0])[D_ind%2]);
           fputs(fn,fp);
         }
@@ -117,7 +119,8 @@ namespace cob_3d_feature_map {
       for(size_t i=0; i<hotspots.size(); i++) {
         if(prob_result[i]<thr) continue;
 
-        if(i==0||i==78) {
+        //if(i==0||i==78)
+        {
           //debug svg
           char fn[512];
           sprintf(fn,"/tmp/haar%d_%d.svg",(int)i,(int)D_ind);
@@ -125,13 +128,14 @@ namespace cob_3d_feature_map {
           fputs("<?xml version=\"1.0\" ?><svg width=\"200\" height=\"200\">",fp);
           for(size_t ji=0; ji<hotspots[i]->getInstances().size(); ji++)
           {
-            sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" fill=\"rgb(%d,%d,0)\" /><text x=\"%f\" y=\"%f\">%f</text>",
-                    hotspots[i]->getInstances()[ji]->getRepresentation().getMean()(0)*20 + 344/100.f,
-                    hotspots[i]->getInstances()[ji]->getRepresentation().getMean()(1)*20 + 344/100.f,
+            sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" fill=\"rgb(%d,%d,0)\" /><text x=\"%f\" y=\"%f\">%.2f %.2f</text>",
+                    REWORK(hotspots[i]->getInstances()[ji]->getRepresentation().getMean()(0)),
+                    REWORK(hotspots[i]->getInstances()[ji]->getRepresentation().getMean()(1)),
                     (int)(hotspots[i]->getInstances()[ji]->getAccDescr().weight(D_ind,0)*255),(int)(hotspots[i]->getInstances()[ji]->getAccDescr().weight(D_ind,0)*255),
-                    hotspots[i]->getInstances()[ji]->getRepresentation().getMean()(0)*20 + 344/100.f,
-                    hotspots[i]->getInstances()[ji]->getRepresentation().getMean()(1)*20 + 344/100.f,
-                    (*hotspots[i]->getInstances()[ji]->getFeatures()[0])[D_ind%2]);
+                    REWORK(hotspots[i]->getInstances()[ji]->getRepresentation().getMean()(0)),
+                    REWORK(hotspots[i]->getInstances()[ji]->getRepresentation().getMean()(1)),
+                    (*hotspots[i]->getInstances()[ji]->getFeatures()[0])[D_ind%2],
+                    (*hotspots[i]->getInstances()[ji]->getFeatures()[0]).getDescriptor().weight((int)D_ind, 0));
             fputs(fn,fp);
           }
           fputs("</svg>",fp);

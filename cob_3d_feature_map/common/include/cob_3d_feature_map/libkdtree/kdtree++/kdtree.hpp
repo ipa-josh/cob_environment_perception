@@ -710,6 +710,8 @@ namespace KDTree
       _M_insert(_Link_type __N, const_reference __V,
              size_type const __L)
       {
+        if(__N->_M_value == __V)
+          return iterator(__N);
         if (_Node_compare_(__L % __K, _M_acc, _M_cmp)(__V, __N->_M_value))
           {
             if (!_S_left(__N))
@@ -1093,7 +1095,7 @@ namespace KDTree
         // note: no else!  items that are identical can be down both branches
         if ( _S_right(node) && found == this->end() && !compare(value,node->_M_value))   // note, this is a <= test
         {
-            found = _M_find_exact_ex(_S_right(node), value, level+1, descr, false);
+            found = _M_find_exact_ex(_S_right(node), value, level+1, descr, ((level+1)%__K)==0);
             if(found!=this->end()) {
               descr.container()[0].push_back(
                   std::abs(

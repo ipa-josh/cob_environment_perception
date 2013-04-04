@@ -15,7 +15,7 @@ void simulate_scan(const float a1, float a2, const int x, const int y, const uns
   if(a2<a1) a2+=2*M_PI;
 
   int i=0;
-  for(float a=a1; a<a2; a+= (a2-a1)/scan.size() )
+  for(float a=a1; a<a2; a+=(a2-a1)/scan.size() )
   {
     float dx = std::cos(a);
     float dy = std::sin(a);
@@ -30,8 +30,8 @@ void simulate_scan(const float a1, float a2, const int x, const int y, const uns
         if(px<0 || px>=w) break;
         if(pgm[px+(p+y)*w]<128) {
           v = std::sqrt(p*p*(1+dx*dx));
-          s2(0) = px;
-          s2(1) = p+y;
+          s2(0) = px-x;
+          s2(1) = p;
           break;
         }
         p++;
@@ -45,8 +45,8 @@ void simulate_scan(const float a1, float a2, const int x, const int y, const uns
         if(py<0 || py>=h) break;
         if(pgm[p+x+(py)*w]<128) {
           v = std::sqrt(p*p*(1+dy*dy));
-          s2(0) = p+x;
-          s2(1) = py;
+          s2(0) = p;
+          s2(1) = py-y;
           break;
         }
         p++;
@@ -61,34 +61,42 @@ void simulate_scan(const float a1, float a2, const int x, const int y, const uns
 }
 
 template<typename FT>
-void generate_ft(const std::vector<float> &scan, std::vector<FT> &fts)
+void generate_ft(const std::vector<float> &scan, const std::vector<Eigen::Vector2i> &scan2, std::vector<FT> &fts)
 {
 
   for(size_t i=0; i<scan.size(); i++)
   {
-    Eigen::Vector3f sum_v = Eigen::Vector3f::Zero();
-    Eigen::Matrix3f sum_M = Eigen::Matrix3f::Zero();
+    Eigen::Vector4f sum_v = Eigen::Vector4f::Zero();
+    Eigen::Matrix4f sum_M = Eigen::Matrix4f::Zero();
 
-    for(int d=-5; d<=5; d++) {
+    int n=0;
+    for(int d=-10; d<=10; d++) {
       int ind = (int)i+d;
       if(ind<0) ind+=(int)scan.size();
       ind%=scan.size();
 
-      if(scan[ind]!=scan[ind])
+      if(scan[ind]!=scan[ind])// || std::abs(scan[ind]-scan[i])>5)
         continue;
 
-      Eigen::Vector3f v;
+      Eigen::Vector4f v;
       v(0)=1;
       v(1)=d;
       v(2)=d*d;
-      Eigen::Matrix3f M = v*v.transpose();
+      v(2)=d*d*d;
+      Eigen::Matrix4f M = v*v.transpose();
       v *= scan[ind];
 
       sum_v += v;
       sum_M += M;
+      ++n;
     }
 
-    fts[i].getContent() = sum_M.inverse()*sum_v;
+    sum_v = sum_M.inverse()*sum_v;
+    /*sum_v(0) = std::min(10.f, std::max(-10.f,sum_v(0)/10));
+    sum_v(1) = std::min(10.f, std::max(-10.f,std::atan(sum_v(1))));
+    sum_v(2) = std::min(10.f, std::max(-10.f,std::atan(sum_v(2))));*/
+    fts[i].getContent()(0) = scan2[i](0)%7;sum_v(2);
+    fts[i].getContent()(1) = scan2[i](1)%7;sum_v(3);
   }
 }
 
@@ -117,9 +125,9 @@ int main(int argc, char **argv) {
       for(int p=0; p<8; p++) {
         std::vector<float> scan(100);
         std::vector<Eigen::Vector2i> scan2(100);
-        simulate_scan( (p/8*2*M_PI)-M_PI/4, (p/8*2*M_PI)+M_PI/4, x,y, pgm,w,h, scan, scan2);
         std::vector<SI::FT> fts(100);
-        generate_ft(scan, fts);
+        simulate_scan( (p/8.*2*M_PI)-M_PI/4, (p/8.*2*M_PI)+M_PI/4, x,y, pgm,w,h, scan, scan2);
+        generate_ft(scan, scan2, fts);
 
         boost::shared_ptr<SI::CL> pcl(new SI::CL);
         clusters.push_back(pcl);
@@ -176,7 +184,7 @@ int main(int argc, char **argv) {
     std::vector<Eigen::Vector2i> scan2(100);
     simulate_scan( alpha-M_PI/4, alpha+M_PI/4, sx,sy, pgm,w,h, scan, scan2);
     std::vector<SI::FT> fts(100);
-    generate_ft(scan, fts);
+    generate_ft(scan, scan2, fts);
 
     for(size_t i=0; i<fts.size(); i++) {
       if(fts[i].getContent().sum()!=fts[i].getContent().sum()) continue;
@@ -216,8 +224,23 @@ int main(int argc, char **argv) {
     for(size_t i=0; i<clusters[c]->getInstances().size(); i++)
     {
       sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" />",
-              clusters[c]->getInstances()[i]->getRepresentation().getMean()(0)*1.f,
-              clusters[c]->getInstances()[i]->getRepresentation().getMean()(1)*1.f);
+              clusters[c]->getInstances()[i]->getRepresentation().getMean()(0)*2.f+10,
+              clusters[c]->getInstances()[i]->getRepresentation().getMean()(1)*2.f+10);
+      fputs(fn,fp);
+    }
+    fputs("</svg>",fp);
+    fclose(fp);
+  }
+  {
+    char fn[512];
+    sprintf(fn,"/tmp/search.svg");
+    FILE *fp=fopen(fn,"w");
+    fputs("<?xml version=\"1.0\" ?><svg width=\"200\" height=\"200\">",fp);
+    for(size_t i=0; i<scl->getInstances().size(); i++)
+    {
+      sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" />",
+              scl->getInstances()[i]->getRepresentation().getMean()(0)*2.f+10,
+              scl->getInstances()[i]->getRepresentation().getMean()(1)*2.f+10);
       fputs(fn,fp);
     }
     fputs("</svg>",fp);
@@ -234,6 +257,7 @@ int main(int argc, char **argv) {
   for(size_t i=0; i<result.size(); i++)
     std::cout<<"R: "<<result[i]<<std::endl;
   std::cout<<"best match: "<<p<<std::endl;
+  std::cout<<"gt: "<<sx/step<<" "<<sy/step<<"  "<<8*(sy/step + (sx/step)*(h/step))<<std::endl;
 
   delete [] pgm;
   return 0;

@@ -63,13 +63,13 @@ namespace cob_3d_feature_map {
     TYPE split_all(const size_t ind, std::vector<ClusterReprsentation> &ret) const //-->p[0,1]
     {
     	TYPE w=0;
-      ret.clear();
-      for(int i=0; i<Instance::DESCRIPTOR::CODES; i++) {
-        ClusterReprsentation r;
-        for(size_t j=0; j<instances_.size(); j++) {
-        	TYPE t = instances_[j]->getAccDescr().weight(ind, i);
-        	w += t;
-          r += instances_[j]->getRepresentation() * t;
+    	ret.clear();
+    	for(int i=0; i<Instance::DESCRIPTOR::CODES; i++) {
+    	  ClusterReprsentation r;
+    	  for(size_t j=0; j<instances_.size(); j++) {
+    	    TYPE t = instances_[j]->getAccDescr().weight(ind, i);
+    	    w += t;
+    	    r += instances_[j]->getRepresentation() * t;
         }
         ret.push_back(r);
       }
