@@ -32,6 +32,8 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
 
+rosbuild_add_executable(map_2d ros/src/map_2d.cpp common/src/pgm_loader.cpp)
+
 rosbuild_add_executable(test_2d_map ros/test/test_2d_map.cpp)
 target_link_libraries(test_2d_map gtest)
 
