@@ -35,7 +35,7 @@ namespace cob_3d_feature_map {
     std::vector<InstacePtr> &getInstances()
     { return instances_;}
     const std::vector<InstacePtr> &getInstances() const
-    { return instances_;}
+        { return instances_;}
 
     const ClusterReprsentation &getRepresentation() const
     { return rep_; }
@@ -62,14 +62,20 @@ namespace cob_3d_feature_map {
 
     TYPE split_all(const size_t ind, std::vector<ClusterReprsentation> &ret) const //-->p[0,1]
     {
-    	TYPE w=0;
-    	ret.clear();
-    	for(int i=0; i<Instance::DESCRIPTOR::CODES; i++) {
-    	  ClusterReprsentation r;
-    	  for(size_t j=0; j<instances_.size(); j++) {
-    	    TYPE t = instances_[j]->getAccDescr().weight(ind, i);
-    	    w += t;
-    	    r += instances_[j]->getRepresentation() * t;
+      TYPE w=0;
+      ret.clear();
+      for(int i=0; i<Instance::DESCRIPTOR::CODES; i++) {
+        ClusterReprsentation r;
+        std::cout<<"num "<<instances_.size()<<"\n";
+        for(size_t j=0; j<instances_.size(); j++) {
+          TYPE t = instances_[j]->getAccDescr().weight(ind, i);
+          w += t;
+          r += instances_[j]->getRepresentation() * t;
+          std::cout<<"MYW "<<w<<"\n";
+          std::cout<<r.getMean().transpose()<<"\n";
+          std::cout<<r.getCoVar()<<"\n";
+          std::cout<<instances_[j]->getRepresentation().getMean().transpose()<<"\n";
+          std::cout<<instances_[j]->getRepresentation().getCoVar()<<"\n";
         }
         ret.push_back(r);
       }

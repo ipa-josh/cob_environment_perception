@@ -75,7 +75,8 @@ namespace cob_3d_feature_map {
     }
 
     size_t D_ind=0;
-    while(num>1) {
+    while(D_ind<5) {
+      //while(num>1) {
       std::cout<<"type "<<D_ind%4<<std::endl;
       std::cout<<"found: "<<num<<std::endl;
 
@@ -117,7 +118,7 @@ namespace cob_3d_feature_map {
       ind = (size_t)-1;
 
       for(size_t i=0; i<hotspots.size(); i++) {
-        if(prob_result[i]<thr) continue;
+        //if(prob_result[i]<thr) continue;
 
         //if(i==0||i==78)
         {

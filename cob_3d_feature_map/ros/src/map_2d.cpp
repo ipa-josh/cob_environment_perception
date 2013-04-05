@@ -95,8 +95,8 @@ void generate_ft(const std::vector<float> &scan, const std::vector<Eigen::Vector
     /*sum_v(0) = std::min(10.f, std::max(-10.f,sum_v(0)/10));
     sum_v(1) = std::min(10.f, std::max(-10.f,std::atan(sum_v(1))));
     sum_v(2) = std::min(10.f, std::max(-10.f,std::atan(sum_v(2))));*/
-    fts[i].getContent()(0) = scan2[i](0)%7;sum_v(2);
-    fts[i].getContent()(1) = scan2[i](1)%7;sum_v(3);
+    fts[i].getContent()(0) = scan2[i](0)/7;sum_v(2);
+    fts[i].getContent()(1) = scan2[i](1)/7;sum_v(3);
   }
 }
 
@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  typedef cob_3d_feature_map::SimplifiedInterface_Eigen<3,2> SI;
+  typedef cob_3d_feature_map::SimplifiedInterface_Eigen<2,2> SI;
   typedef SI::FT FT;
   SI::treeType tree;
   std::vector<boost::shared_ptr<SI::CL> > clusters;
@@ -122,12 +122,14 @@ int main(int argc, char **argv) {
   for(int x=0; x<w; x+=step)
     for(int y=0; y<h; y+=step)
     {
-      for(int p=0; p<8; p++) {
+      for(int p=0; p<4; p++) {
         std::vector<float> scan(100);
         std::vector<Eigen::Vector2i> scan2(100);
         std::vector<SI::FT> fts(100);
         simulate_scan( (p/8.*2*M_PI)-M_PI/4, (p/8.*2*M_PI)+M_PI/4, x,y, pgm,w,h, scan, scan2);
         generate_ft(scan, scan2, fts);
+
+        std::cout<<clusters.size()<<": "<<x<<" "<<y<<std::endl;
 
         boost::shared_ptr<SI::CL> pcl(new SI::CL);
         clusters.push_back(pcl);
@@ -173,9 +175,9 @@ int main(int argc, char **argv) {
   std::cerr<<"\n";
 
   //generate random search pos
-  int sx = rand()%w;
-  int sy = rand()%h;
-  float alpha = (rand()%360)*M_PI/180;
+  int sx = 65;rand()%w;
+  int sy = 65;rand()%h;
+  float alpha = 0;(rand()%360)*M_PI/180;
   ROS_INFO("random pose (%d,%d,%f)",sx,sy,alpha);
 
   boost::shared_ptr<SI::CL> scl(new SI::CL);
@@ -250,8 +252,9 @@ int main(int argc, char **argv) {
   SI::COR_SET search_cluster(scl);
   std::vector<SI::COR_SET> sets;
   std::vector<float> result;
-  for(std::vector<boost::shared_ptr<SI::CL> >::const_iterator it = clusters.begin()+0; it!=clusters.end(); ++it)
-    sets.push_back( SI::COR_SET(*it, search_cluster.getPtr()) );
+//  for(std::vector<boost::shared_ptr<SI::CL> >::const_iterator it = clusters.begin()+0; it!=clusters.end(); ++it)
+//    sets.push_back( SI::COR_SET(*it, search_cluster.getPtr()) );
+  for(int i=0; i<6*4; i++) sets.push_back( SI::COR_SET(clusters[96+i], search_cluster.getPtr()) );
   size_t p = cob_3d_feature_map::haar_wavelet(result, sets, search_cluster, 0.2f);
 
   for(size_t i=0; i<result.size(); i++)
