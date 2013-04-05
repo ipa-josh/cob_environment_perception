@@ -95,8 +95,8 @@ void generate_ft(const std::vector<float> &scan, const std::vector<Eigen::Vector
     /*sum_v(0) = std::min(10.f, std::max(-10.f,sum_v(0)/10));
     sum_v(1) = std::min(10.f, std::max(-10.f,std::atan(sum_v(1))));
     sum_v(2) = std::min(10.f, std::max(-10.f,std::atan(sum_v(2))));*/
-    fts[i].getContent()(0) = scan2[i](0)%7;sum_v(2);
-    fts[i].getContent()(1) = scan2[i](1)%7;sum_v(3);
+    fts[i].getContent()(0) = scan2[i](0)/7;sum_v(2);
+    fts[i].getContent()(1) = scan2[i](1)/7;sum_v(3);
   }
 }
 
@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  typedef cob_3d_feature_map::SimplifiedInterface_Eigen<3,2> SI;
+  typedef cob_3d_feature_map::SimplifiedInterface_Eigen<2,2> SI;
   typedef SI::FT FT;
   SI::treeType tree;
   std::vector<boost::shared_ptr<SI::CL> > clusters;
@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
   for(int x=0; x<w; x+=step)
     for(int y=0; y<h; y+=step)
     {
-      for(int p=0; p<8; p++) {
+      for(int p=0; p<4; p++) {
         std::vector<float> scan(100);
         std::vector<Eigen::Vector2i> scan2(100);
         std::vector<SI::FT> fts(100);
