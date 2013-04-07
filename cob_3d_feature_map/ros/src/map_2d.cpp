@@ -11,6 +11,9 @@
 #include <cob_3d_feature_map/simplified.h>
 #include <cob_3d_feature_map/tools/pgm_loader.h>
 
+//#define FIND_CORS
+#define DEBUG
+
 void simulate_scan(const float a1, float a2, const int x, const int y, const unsigned char * const pgm, const int w, const int h, std::vector<float> &scan, std::vector<Eigen::Vector2i> &scan2) {
   if(a2<a1) a2+=2*M_PI;
 
@@ -95,8 +98,8 @@ void generate_ft(const std::vector<float> &scan, const std::vector<Eigen::Vector
     /*sum_v(0) = std::min(10.f, std::max(-10.f,sum_v(0)/10));
     sum_v(1) = std::min(10.f, std::max(-10.f,std::atan(sum_v(1))));
     sum_v(2) = std::min(10.f, std::max(-10.f,std::atan(sum_v(2))));*/
-    fts[i].getContent()(0) = scan2[i](0)/7;sum_v(2);
-    fts[i].getContent()(1) = scan2[i](1)/7;sum_v(3);
+    fts[i].getContent()(0) = i;(sum_v(2)==sum_v(2)?sum_v(2):0);
+    fts[i].getContent()(1) = n;(sum_v(3)==sum_v(3)?sum_v(3):0);
   }
 }
 
@@ -175,8 +178,9 @@ int main(int argc, char **argv) {
   std::cerr<<"\n";
 
   //generate random search pos
-  int sx = 65;rand()%w;
-  int sy = 65;rand()%h;
+  srand(time(NULL));
+  int sx = rand()%(w-1)+1;w/2;
+  int sy = rand()%(h-1)+1;h/2;
   float alpha = 0;(rand()%360)*M_PI/180;
   ROS_INFO("random pose (%d,%d,%f)",sx,sy,alpha);
 
@@ -249,18 +253,62 @@ int main(int argc, char **argv) {
     fclose(fp);
   }
 
+  std::vector<float> result;
+#ifdef FIND_CORS
   SI::COR_SET search_cluster(scl);
   std::vector<SI::COR_SET> sets;
-  std::vector<float> result;
-//  for(std::vector<boost::shared_ptr<SI::CL> >::const_iterator it = clusters.begin()+0; it!=clusters.end(); ++it)
-//    sets.push_back( SI::COR_SET(*it, search_cluster.getPtr()) );
-  for(int i=0; i<6*4; i++) sets.push_back( SI::COR_SET(clusters[96+i], search_cluster.getPtr()) );
-  size_t p = cob_3d_feature_map::haar_wavelet(result, sets, search_cluster, 0.2f);
+  for(std::vector<boost::shared_ptr<SI::CL> >::const_iterator it = clusters.begin()+0; it!=clusters.end(); ++it)
+    sets.push_back( SI::COR_SET(*it, search_cluster.getPtr()) );
+//  for(int i=0; i<6; i++) sets.push_back( SI::COR_SET(clusters[96+i], search_cluster.getPtr()) );
+#else
+  boost::shared_ptr<SI::CL> &search_cluster = scl;
+  std::vector<boost::shared_ptr<SI::CL> > &sets = clusters;
+#endif
+  size_t p = cob_3d_feature_map::haar_wavelet(result, sets, search_cluster, 0.9f);
 
   for(size_t i=0; i<result.size(); i++)
     std::cout<<"R: "<<result[i]<<std::endl;
   std::cout<<"best match: "<<p<<std::endl;
-  std::cout<<"gt: "<<sx/step<<" "<<sy/step<<"  "<<8*(sy/step + (sx/step)*(h/step))<<std::endl;
+  std::cout<<"gt: "<<sx/step<<" "<<sy/step<<"  "<<4*((sy/step)*(w/step) + (sx/step))<<std::endl;
+
+  //debug svg
+    //size_t c=0; //or "p"
+    for(size_t c=0; c<clusters.size(); c++) {
+      char fn[512];
+      sprintf(fn,"/tmp/comp%d.svg",(int)c);
+      FILE *fp=fopen(fn,"w");
+      fputs("<?xml version=\"1.0\" ?><svg width=\"400\" height=\"200\">",fp);
+      for(size_t i=0; i<search_cluster->getInstances().size(); i++)
+      {
+        sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" fill=\"black\"/>",
+                search_cluster->getInstances()[i]->getRepresentation().getMean()(0)*2.f+10,
+                search_cluster->getInstances()[i]->getRepresentation().getMean()(1)*2.f+10);
+        fputs(fn,fp);
+      }
+      for(size_t i=0; i<clusters[c]->getInstances().size(); i++)
+      {
+        sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" fill=\"red\"/>",
+                clusters[c]->getInstances()[i]->getRepresentation().getMean()(0)*2.f+10+200,
+                clusters[c]->getInstances()[i]->getRepresentation().getMean()(1)*2.f+10);
+        fputs(fn,fp);
+      }
+#ifdef FIND_CORS
+      for(size_t i=0; i<sets[c].getCors().size(); i++) {
+        if(sets[c].getCors()[i].getMaxP()<0.5) continue;
+        float x1 = sets[c].getCors()[i].getOrigin()->getRepresentation().getMean()(0)*2.f+10+200;
+        float y1 = sets[c].getCors()[i].getOrigin()->getRepresentation().getMean()(1)*2.f+10;
+        float x2 = sets[c].getCors()[i].getBestMatch()->getRepresentation().getMean()(0)*2.f+10;
+        float y2 = sets[c].getCors()[i].getBestMatch()->getRepresentation().getMean()(1)*2.f+10;
+        sprintf(fn,"<line x1=\"%f\" y1=\"%f\" x2=\"%f\" y2=\"%f\" style=\"stroke:rgb(0,0,0);stroke-width:1\"/><text x=\"%f\" y=\"%f\">%f</text>",
+                x1, y1,
+                x2, y2,
+                (x1+x2)/2, (y1+y2)/2, sets[c].getCors()[i].getMaxP());
+        fputs(fn,fp);
+      }
+#endif
+      fputs("</svg>",fp);
+      fclose(fp);
+    }
 
   delete [] pgm;
   return 0;
