@@ -71,11 +71,11 @@ namespace cob_3d_feature_map {
           TYPE t = instances_[j]->getAccDescr().weight(ind, i);
           w += t;
           r += instances_[j]->getRepresentation() * t;
-          std::cout<<"MYW "<<w<<"\n";
-          std::cout<<r.getMean().transpose()<<"\n";
-          std::cout<<r.getCoVar()<<"\n";
-          std::cout<<instances_[j]->getRepresentation().getMean().transpose()<<"\n";
-          std::cout<<instances_[j]->getRepresentation().getCoVar()<<"\n";
+//          std::cout<<"MYW "<<w<<"\n";
+//          std::cout<<r.getMean().transpose()<<"\n";
+//          std::cout<<r.getCoVar()<<"\n";
+//          std::cout<<instances_[j]->getRepresentation().getMean().transpose()<<"\n";
+//          std::cout<<instances_[j]->getRepresentation().getCoVar()<<"\n";
         }
         ret.push_back(r);
       }
