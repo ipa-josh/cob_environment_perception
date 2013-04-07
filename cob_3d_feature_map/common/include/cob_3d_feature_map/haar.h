@@ -14,21 +14,21 @@
 namespace cob_3d_feature_map {
 
   template<typename Cluster>
-  typename Cluster::TYPE __cmp_split(boost::shared_ptr<Cluster> &cs, const std::vector<typename Cluster::ClusterReprsentation> &o, const size_t ind, const typename Cluster::ClusterReprsentation &r2) //-->p[0,1]
+  typename Cluster::TYPE __cmp_split(boost::shared_ptr<Cluster> &cs, const std::vector<typename Cluster::ClusterReprsentation> &o, const size_t ind, const typename Cluster::ClusterReprsentation &r2, const typename Cluster::TYPE &std) //-->p[0,1]
   {
     typename Cluster::TYPE p=0, w=0;
     for(int i=0; i<Cluster::INSTANCE::DESCRIPTOR::CODES; i++) {
       typename Cluster::ClusterReprsentation r = cs->split(ind, i);
       typename Cluster::TYPE t = std::sqrt( (r.getWeight()+o[i].getWeight())/2 );
       //p += t * r.cmp(o[i]);
-      p += t * r.cmp2(o[i],cs->getRepresentation(),r2);
+      p += t * r.cmp2(o[i],cs->getRepresentation(),r2, std);
       w += t;
     }
     return p/w;
   }
 
   template<typename ClusterSummarizer>
-  typename ClusterSummarizer::element_type::TYPE __cmp_split(ClusterSummarizer &cs, const std::vector<typename ClusterSummarizer::element_type::ClusterReprsentation> &o, const size_t ind, const typename ClusterSummarizer::element_type::ClusterReprsentation &r2) //-->p[0,1]
+  typename ClusterSummarizer::element_type::TYPE __cmp_split(ClusterSummarizer &cs, const std::vector<typename ClusterSummarizer::element_type::ClusterReprsentation> &o, const size_t ind, const typename ClusterSummarizer::element_type::ClusterReprsentation &r2, const typename ClusterSummarizer::element_type::TYPE &std) //-->p[0,1]
   {
     typedef typename ClusterSummarizer::element_type Cluster;
     typename Cluster::TYPE p=0, w=0;
@@ -36,7 +36,7 @@ namespace cob_3d_feature_map {
       typename Cluster::ClusterReprsentation r = cs->split(ind, i);
       typename Cluster::TYPE t = std::sqrt( (r.getWeight()+o[i].getWeight())/2 );
       //p += t * r.cmp(o[i]);
-      p += t * r.cmp2(o[i],cs->getRepresentation(),r2);
+      p += t * r.cmp2(o[i],cs->getRepresentation(),r2, std);
       w += t;
 
       cs.update(r,o[i],t);
@@ -55,9 +55,11 @@ namespace cob_3d_feature_map {
 #endif
     prob_result.resize(hotspots.size());
 
+    const Type std = std::sqrt(input->getRepresentation().getEigenvalueMax());
+
     size_t num = 0, ind=0;
     for(size_t i=0; i<hotspots.size(); i++) {
-      Type p = hotspots[i]->cmp(*input);
+      Type p = hotspots[i]->cmp(*input, std);
       if(p!=p) p=0;
 
 #ifdef CMP2
@@ -143,7 +145,7 @@ namespace cob_3d_feature_map {
           fclose(fp);
         }
 
-        Type p = __cmp_split(hotspots[i], rep, D_ind, input->getRepresentation());
+        Type p = __cmp_split(hotspots[i], rep, D_ind, input->getRepresentation(), std);
         if(p!=p) p=0;
 
 #ifdef CMP2

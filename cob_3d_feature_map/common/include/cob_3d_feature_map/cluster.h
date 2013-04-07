@@ -46,9 +46,9 @@ namespace cob_3d_feature_map {
       rep_ += inst->getRepresentation();
     }
 
-    TYPE cmp(const Cluster &o) const //-->p[0,1]
+    TYPE cmp(const Cluster &o, const TYPE &std) const //-->p[0,1]
     {
-      return rep_.cmp(o.rep_);
+      return rep_.cmp(o.rep_, std);
     }
 
     ClusterReprsentation split(const size_t ind, const int code) const //-->p[0,1]
