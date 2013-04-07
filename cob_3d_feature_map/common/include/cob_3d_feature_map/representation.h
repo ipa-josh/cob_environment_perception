@@ -113,8 +113,9 @@ namespace cob_3d_feature_map {
     }
 
     /// p: [0,1]
-    inline Type cmp(const ClusterReprsentation &o) const {
-      return 1/(std::log(d(getCoVar(), o.getCoVar())+1)+1);
+    inline Type cmp(const ClusterReprsentation &o, const Type &std) const {
+      return (std::exp( std::pow( d(getCoVar(), o.getCoVar())/std ,2)/-2 ));
+      //return 1/(std::log(d(getCoVar(), o.getCoVar())+1)+1);
     }
 
     inline Type cmp2(const ClusterReprsentation &o, const ClusterReprsentation &r1, const ClusterReprsentation &r2) const {
@@ -167,6 +168,14 @@ namespace cob_3d_feature_map {
 
     inline Type getWeight() const {
       return weight_;
+    }
+
+    inline Type getEigenvalueMax() const {
+        Eigen::SelfAdjointEigenSolver<MatrixU> es(getCoVar(), Eigen::EigenvaluesOnly);
+        Type m=0;
+        for(size_t i=0; i<Dimension; i++)
+                m = std::max(std::abs(es.eigenvalues()(i)),m);
+        return m;
     }
 
   };
