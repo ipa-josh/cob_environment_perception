@@ -118,23 +118,26 @@ namespace cob_3d_feature_map {
       //return 1/(std::log(d(getCoVar(), o.getCoVar())+1)+1);
     }
 
-    inline Type cmp2(const ClusterReprsentation &o, const ClusterReprsentation &r1, const ClusterReprsentation &r2) const {
-      const Type dist1 = d2(getCoVar()*r1.getCoVar().inverse(), o.getCoVar()*r2.getCoVar().inverse());
+    inline Type cmp2(const ClusterReprsentation &o, const ClusterReprsentation &r1, const ClusterReprsentation &r2, const Type &std) const {
+      //const Type dist1 = d2(getCoVar()*r1.getCoVar().inverse(), o.getCoVar()*r2.getCoVar().inverse());
+      const Type dist1 = d2(getCoVar(), o.getCoVar());
       const Type dist2 = std::pow(std::log(std::sqrt( (mean_-r1.mean_).squaredNorm()/(o.mean_-r2.mean_).squaredNorm() )),2);
 
-      std::cout<<"dist1: "<<dist1<<std::endl;
-      std::cout<<"dist2: "<<dist2<<std::endl;
+//      std::cout<<"dist1: "<<dist1<<std::endl;
+//      std::cout<<"dist2: "<<dist2<<std::endl;
+//      std::cout<<"std: "<<std<<std::endl;
+//
+//      std::cout<<"R1: "<<r1.getCoVar()<<std::endl;
+//      std::cout<<"R2: "<<r2.getCoVar()<<std::endl;
+//
+//      std::cout<<"C1: "<<getCoVar()<<std::endl;
+//      std::cout<<"C2: "<<o.getCoVar()<<std::endl;
+//
+//      std::cout<<"C1: "<<getCoVar()*r1.getCoVar().inverse()<<std::endl;
+//      std::cout<<"C2: "<<o.getCoVar()*r2.getCoVar().inverse()<<std::endl;
 
-      std::cout<<"R1: "<<r1.getCoVar()<<std::endl;
-      std::cout<<"R2: "<<r2.getCoVar()<<std::endl;
-
-      std::cout<<"C1: "<<getCoVar()<<std::endl;
-      std::cout<<"C2: "<<o.getCoVar()<<std::endl;
-
-      std::cout<<"C1: "<<getCoVar()*r1.getCoVar().inverse()<<std::endl;
-      std::cout<<"C2: "<<o.getCoVar()*r2.getCoVar().inverse()<<std::endl;
-
-      return 1/(std::log(dist1+dist2+1)+1);
+      return (std::exp( std::pow( (dist1+dist2)/std ,2)/-2 ));
+      //return 1/(std::log(dist1+dist2+1)+1);
     }
 
     inline Type cmp3(const ClusterReprsentation &o, const ClusterReprsentation &r1, const ClusterReprsentation &r2) const {
