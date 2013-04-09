@@ -231,7 +231,7 @@ int main(int argc, char **argv) {
     {
       sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" />",
               clusters[c]->getInstances()[i]->getRepresentation().getMean()(0)*2.f+10,
-              clusters[c]->getInstances()[i]->getRepresentation().getMean()(1)*2.f+10);
+              clusters[c]->getInstances()[i]->getRepresentation().getMean()(1)*2.f+50);
       fputs(fn,fp);
     }
     fputs("</svg>",fp);
