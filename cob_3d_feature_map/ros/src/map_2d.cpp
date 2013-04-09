@@ -64,7 +64,7 @@ void simulate_scan(const float a1, float a2, const int x, const int y, const uns
 }
 
 template<typename FT>
-void generate_ft(const std::vector<float> &scan, const std::vector<Eigen::Vector2i> &scan2, std::vector<FT> &fts)
+void generate_ft(const std::vector<float> &scan, const std::vector<Eigen::Vector2i> &scan2, std::vector<FT> &fts, const int x, const int y)
 {
 
   for(size_t i=0; i<scan.size(); i++)
@@ -73,7 +73,7 @@ void generate_ft(const std::vector<float> &scan, const std::vector<Eigen::Vector
     Eigen::Matrix4f sum_M = Eigen::Matrix4f::Zero();
 
     int n=0;
-    for(int d=-10; d<=10; d++) {
+    for(int d=-5; d<=5; d++) {
       int ind = (int)i+d;
       if(ind<0) ind+=(int)scan.size();
       ind%=scan.size();
@@ -98,8 +98,8 @@ void generate_ft(const std::vector<float> &scan, const std::vector<Eigen::Vector
     /*sum_v(0) = std::min(10.f, std::max(-10.f,sum_v(0)/10));
     sum_v(1) = std::min(10.f, std::max(-10.f,std::atan(sum_v(1))));
     sum_v(2) = std::min(10.f, std::max(-10.f,std::atan(sum_v(2))));*/
-    fts[i].getContent()(0) = i;(sum_v(2)==sum_v(2)?sum_v(2):0);
-    fts[i].getContent()(1) = n;(sum_v(3)==sum_v(3)?sum_v(3):0);
+    fts[i].getContent()(0) = scan[i];(sum_v(2)==sum_v(2)?sum_v(2):0);
+    fts[i].getContent()(1) = scan[i];(sum_v(3)==sum_v(3)?sum_v(3):0);
   }
 }
 
@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
         std::vector<Eigen::Vector2i> scan2(100);
         std::vector<SI::FT> fts(100);
         simulate_scan( (p/8.*2*M_PI)-M_PI/4, (p/8.*2*M_PI)+M_PI/4, x,y, pgm,w,h, scan, scan2);
-        generate_ft(scan, scan2, fts);
+        generate_ft(scan, scan2, fts, x,y);
 
         std::cout<<clusters.size()<<": "<<x<<" "<<y<<std::endl;
 
@@ -182,19 +182,26 @@ int main(int argc, char **argv) {
   int sx = rand()%(w-1)+1;w/2;
   int sy = rand()%(h-1)+1;h/2;
   float alpha = 0;(rand()%360)*M_PI/180;
-  ROS_INFO("random pose (%d,%d,%f)",sx,sy,alpha);
 
   boost::shared_ptr<SI::CL> scl(new SI::CL);
-  {
+  while(true) {
+
+    sx = rand()%(w-1)+1;w/2;
+    sy = rand()%(h-1)+1;h/2;
+    alpha = 0;(rand()%360)*M_PI/180;
+    ROS_INFO("random pose (%d,%d,%f)",sx,sy,alpha);
+
     std::vector<float> scan(100);
     std::vector<Eigen::Vector2i> scan2(100);
     simulate_scan( alpha-M_PI/4, alpha+M_PI/4, sx,sy, pgm,w,h, scan, scan2);
     std::vector<SI::FT> fts(100);
-    generate_ft(scan, scan2, fts);
+    generate_ft(scan, scan2, fts, sx,sy);
 
+    int num=0;
     for(size_t i=0; i<fts.size(); i++) {
       if(fts[i].getContent().sum()!=fts[i].getContent().sum()) continue;
 
+      ++num;
       tree.insert(fts[i]);
       Eigen::Vector2f pt2;
       pt2(0) = scan2[i](0);
@@ -207,6 +214,8 @@ int main(int argc, char **argv) {
       boost::shared_ptr<FT> ft(new FT(fts[i]));
       scl->getInstances().back()->append(ft);
     }
+    if(num<30) continue;
+
     for(size_t i=0; i<scl->getInstances().size(); i++)
     {
       // now do the same with the kdtree.
@@ -219,6 +228,7 @@ int main(int argc, char **argv) {
         );
       }
     }
+    break;
   }
 
   //debug svg
@@ -264,7 +274,7 @@ int main(int argc, char **argv) {
   boost::shared_ptr<SI::CL> &search_cluster = scl;
   std::vector<boost::shared_ptr<SI::CL> > &sets = clusters;
 #endif
-  size_t p = cob_3d_feature_map::haar_wavelet(result, sets, search_cluster, 0.9f);
+  size_t p = cob_3d_feature_map::haar_wavelet(result, sets, search_cluster, 0.8f);
 
   for(size_t i=0; i<result.size(); i++)
     std::cout<<"R: "<<result[i]<<std::endl;
