@@ -5,6 +5,7 @@
  *      Author: josh
  */
 
+#define DEBUG
 
 #include <ros/ros.h>
 
@@ -12,7 +13,6 @@
 #include <cob_3d_feature_map/tools/pgm_loader.h>
 
 //#define FIND_CORS
-#define DEBUG
 
 void simulate_scan(const float a1, float a2, const int x, const int y, const unsigned char * const pgm, const int w, const int h, std::vector<float> &scan, std::vector<Eigen::Vector2i> &scan2) {
   if(a2<a1) a2+=2*M_PI;
@@ -269,7 +269,7 @@ int main(int argc, char **argv) {
   for(size_t i=0; i<result.size(); i++)
     std::cout<<"R: "<<result[i]<<std::endl;
   std::cout<<"best match: "<<p<<std::endl;
-  std::cout<<"gt: "<<sx/step<<" "<<sy/step<<"  "<<4*((sy/step)*(w/step) + (sx/step))<<std::endl;
+  std::cout<<"gt: "<<sx/step<<" "<<sy/step<<"  "<<4*((sy/step) + (sx/step)*(h/step))<<std::endl;
 
   //debug svg
     //size_t c=0; //or "p"

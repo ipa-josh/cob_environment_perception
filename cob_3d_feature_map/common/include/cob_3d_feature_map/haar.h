@@ -182,7 +182,7 @@ namespace cob_3d_feature_map {
 
 #ifdef DEBUG
       for(size_t i=0; i<prob_result.size(); i++)
-        if(prob_result[i]>=thr) std::cout<<"R: "<<prob_result[i]<<std::endl;
+        if(prob_result[i]>=thr) std::cout<<"R("<<i<<"): "<<prob_result[i]<<std::endl;
 #endif
 
       ++D_ind;
