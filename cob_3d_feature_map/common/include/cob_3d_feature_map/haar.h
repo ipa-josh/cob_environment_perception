@@ -9,7 +9,7 @@
 #define HAAR_H_
 
 //#define REWORK(x) (x*20 + 344/100.f)
-#define REWORK(x) (x*2.f+10)
+#define REWORK(x) (x*2.f+50)
 
 namespace cob_3d_feature_map {
 

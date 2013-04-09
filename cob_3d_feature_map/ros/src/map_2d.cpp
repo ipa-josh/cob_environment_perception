@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
     {
       sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" />",
               scl->getInstances()[i]->getRepresentation().getMean()(0)*2.f+10,
-              scl->getInstances()[i]->getRepresentation().getMean()(1)*2.f+10);
+              scl->getInstances()[i]->getRepresentation().getMean()(1)*2.f+50);
       fputs(fn,fp);
     }
     fputs("</svg>",fp);
@@ -282,23 +282,23 @@ int main(int argc, char **argv) {
       {
         sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" fill=\"black\"/>",
                 search_cluster->getInstances()[i]->getRepresentation().getMean()(0)*2.f+10,
-                search_cluster->getInstances()[i]->getRepresentation().getMean()(1)*2.f+10);
+                search_cluster->getInstances()[i]->getRepresentation().getMean()(1)*2.f+50);
         fputs(fn,fp);
       }
       for(size_t i=0; i<clusters[c]->getInstances().size(); i++)
       {
         sprintf(fn,"<circle cx=\"%f\" cy=\"%f\" r=\"3\" fill=\"red\"/>",
                 clusters[c]->getInstances()[i]->getRepresentation().getMean()(0)*2.f+10+200,
-                clusters[c]->getInstances()[i]->getRepresentation().getMean()(1)*2.f+10);
+                clusters[c]->getInstances()[i]->getRepresentation().getMean()(1)*2.f+50);
         fputs(fn,fp);
       }
 #ifdef FIND_CORS
       for(size_t i=0; i<sets[c].getCors().size(); i++) {
         if(sets[c].getCors()[i].getMaxP()<0.5) continue;
         float x1 = sets[c].getCors()[i].getOrigin()->getRepresentation().getMean()(0)*2.f+10+200;
-        float y1 = sets[c].getCors()[i].getOrigin()->getRepresentation().getMean()(1)*2.f+10;
+        float y1 = sets[c].getCors()[i].getOrigin()->getRepresentation().getMean()(1)*2.f+50;
         float x2 = sets[c].getCors()[i].getBestMatch()->getRepresentation().getMean()(0)*2.f+10;
-        float y2 = sets[c].getCors()[i].getBestMatch()->getRepresentation().getMean()(1)*2.f+10;
+        float y2 = sets[c].getCors()[i].getBestMatch()->getRepresentation().getMean()(1)*2.f+30;
         sprintf(fn,"<line x1=\"%f\" y1=\"%f\" x2=\"%f\" y2=\"%f\" style=\"stroke:rgb(0,0,0);stroke-width:1\"/><text x=\"%f\" y=\"%f\">%f</text>",
                 x1, y1,
                 x2, y2,
