@@ -53,6 +53,7 @@ namespace cob_3d_feature_map {
     {
       descr_.descr_.resize(vec.size());
       std::reverse_copy(vec.begin(),vec.end(), descr_.descr_.begin());
+      descr_.clean();
     }
 
     bool operator==(const Feature_kdtree &o) const {

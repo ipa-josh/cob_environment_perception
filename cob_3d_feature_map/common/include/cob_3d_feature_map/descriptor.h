@@ -32,6 +32,11 @@ namespace cob_3d_feature_map {
       descr_.push_back(c);
     }
 
+    inline void clean() {
+      if(descr_.size()>0 && descr_.back()==0.5)
+        descr_.pop_back();
+    }
+
     template<typename Descriptor>
     friend class AccumulatedDescriptor;
 
