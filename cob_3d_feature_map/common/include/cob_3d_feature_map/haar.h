@@ -16,15 +16,23 @@ namespace cob_3d_feature_map {
   template<typename Cluster>
   typename Cluster::TYPE __cmp_split(boost::shared_ptr<Cluster> &cs, const std::vector<typename Cluster::ClusterReprsentation> &o, const size_t ind, const typename Cluster::ClusterReprsentation &r2, const typename Cluster::TYPE &std) //-->p[0,1]
   {
-    typename Cluster::TYPE p=0, w=0;
+    typename Cluster::TYPE pd=0, w=0, pi=1, d=0;
     for(int i=0; i<Cluster::INSTANCE::DESCRIPTOR::CODES; i++) {
       typename Cluster::ClusterReprsentation r = cs->split(ind, i);
-      typename Cluster::TYPE t = std::sqrt( (r.getWeight()+o[i].getWeight())/2 );
+      const typename Cluster::TYPE t = std::sqrt( (r.getWeight()+o[i].getWeight())/2 );
+      const typename Cluster::TYPE p = r.cmp2(o[i],cs->getRepresentation(),r2, std);
       //p += t * r.cmp(o[i]);
-      p += t * r.cmp2(o[i],cs->getRepresentation(),r2, std);
+      //p += t * r.cmp2(o[i],cs->getRepresentation(),r2, std);
+      pd = (w*pd + t*p)/(w+t);
+      pi*= p;
+      d+=std::min( (typename Cluster::TYPE)1, std::abs(t*Cluster::INSTANCE::DESCRIPTOR::CODES-1) );
       w += t;
+      std::cout<<"p "<<p<<" "<<r.getWeight()<<" "<<o[i].getWeight()<<"\n";
     }
-    return p/w;
+    //return pi;
+    //return p/w;
+    d/=Cluster::INSTANCE::DESCRIPTOR::CODES;
+    return d*pd + (1-d)*pi;
   }
 
   template<typename ClusterSummarizer>
