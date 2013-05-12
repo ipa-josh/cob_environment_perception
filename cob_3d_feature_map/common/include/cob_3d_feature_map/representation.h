@@ -32,6 +32,7 @@ namespace cob_3d_feature_map {
     VectorU mean_;        // mean matrix
     Type weight_;         // weight or number of data
 
+#if 0
     /// simalarity with d>=0: d=0 --> equal
     inline static Type d(const MatrixU &covar1, const MatrixU &covar2) {
     	/*Eigen::SelfAdjointEigenSolver<MatrixU> es1(covar1, Eigen::EigenvaluesOnly);
@@ -74,6 +75,38 @@ namespace cob_3d_feature_map {
       std::cout<<es.eigenvalues()<<std::endl;
       std::cout<<"d: "<<d<<std::endl;*/
       return std::sqrt(d);
+    }
+#endif
+    /// simalarity with d>=0: d=0 --> equal
+    inline static Type d(const MatrixU &covar1, const MatrixU &covar2) {
+        return d2(covar1,covar2);
+    }
+
+    inline static Type d2(const MatrixU &covar1, const MatrixU &covar2) {
+      Eigen::SelfAdjointEigenSolver<MatrixU> es1(covar1, Eigen::EigenvaluesOnly);
+      Eigen::SelfAdjointEigenSolver<MatrixU> es2(covar2, Eigen::EigenvaluesOnly);
+
+      std::vector<Type> ev1, ev2;
+
+      Type d=0;//std::numeric_limits<Type>::max();
+      for(size_t i=0; i<Dimension; i++)
+      {
+        ev1.push_back(std::abs(es1.eigenvalues()(i)));
+        ev2.push_back(std::abs(es2.eigenvalues()(i)));
+      }
+      std::sort(ev1.begin(),ev1.end());
+      std::sort(ev2.begin(),ev2.end());
+      for(size_t i=0; i<Dimension; i++)
+      {
+        d += std::abs(ev1[i]-ev2[i]);
+      }
+      /*std::cout<<covar1<<std::endl;
+      std::cout<<covar2<<std::endl;
+      //std::cout<<covar2.inverse()<<std::endl;
+      //std::cout<<es.eigenvectors()<<std::endl;
+      std::cout<<es.eigenvalues()<<std::endl;
+      std::cout<<"d: "<<d<<std::endl;*/
+      return d/Dimension;
     }
 
   public:
