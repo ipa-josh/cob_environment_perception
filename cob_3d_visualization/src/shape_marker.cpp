@@ -518,8 +518,7 @@ ShapeMarker::createMarker (visualization_msgs::InteractiveMarkerControl& im_ctrl
           pt = it->GetPoint (i);
           marker.points[3*ctr+i].x = pt.x;
           marker.points[3*ctr+i].y = pt.y;
-          marker.points[3*ctr+i].z = 0;
-          //if(shape_.id == 39) std::cout << pt.x << "," << pt.y << std::endl;
+          marker.points[3*ctr+i].z = -(pt.x*shape_.params[0]+pt.y*shape_.params[1]-shape_.params[3])/shape_.params[2];
         }
         //std::cout << marker.points.size() << std::endl;
         break;
