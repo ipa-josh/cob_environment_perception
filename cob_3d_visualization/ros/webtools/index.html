@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<script type="text/javascript" src="./include/threejs/three.js"></script>
+<script type="text/javascript" src="./include/EventEmitter2/eventemitter2.js"></script>
+<script type="text/javascript" src="./include/roslibjs/roslib.js"></script>
+<script type="text/javascript" src="./include/build/ros3d.js"></script>
+
+<link rel="stylesheet" href="http://code.jquery.com/ui/1.11.0/themes/smoothness/jquery-ui.css">
+<script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+<script src="http://code.jquery.com/ui/1.11.0/jquery-ui.js"></script>
+<!--link rel="stylesheet" href="/resources/demos/style.css"-->
+<script src="./include/tween.min.js"></script>
+
+<style>
+ol .ui-selecting { background: #FECA40; }
+ol .ui-selected { background: #F39814; color: white; }
+ol { list-style-type: none; margin: 0; padding: 0; width: 90%; }
+ol li { margin: 3px; padding: 0.4em; font-size: 1.4em; height: 18px; }
+</style>
+
+<script type="text/javascript" type="text/javascript">
+  /**
+   * Setup all visualization elements when the page is loaded. 
+   */
+  function init() {
+    $( "#dialog" ).dialog({width: 600, height: 600});
+    $( "#dialog_camera" ).dialog({width: 500});
+
+    // Connect to ROS.
+    var ros = new ROSLIB.Ros({
+      url : 'ws://localhost:9090'
+    });
+
+    // Create the main viewer.
+    var viewer = new ROS3D.Viewer({
+      divID : 'markers',
+      width : 400,
+      height : 300,
+      antialias : true,
+      background : '#ffffff'
+    });
+
+    // Setup a client to listen to TFs.
+    var tfClient = new ROSLIB.TFClient({
+      ros : ros,
+      angularThres : 0.01,
+      transThres : 0.01,
+      rate : 10.0,
+      fixedFrame : '/my_frame'
+    });
+
+    // Setup the marker client.
+    var markerClient = new ROS3D.MarkerClient({
+      ros : ros,
+      tfClient : tfClient,
+      topic : '/visualization_marker',
+      rootObject : viewer.scene
+    });
+
+    viewer.cameraControls.update_ = viewer.cameraControls.update;
+    viewer.cameraControls.update = function() {TWEEN.update();this.update_();}
+    $("body").data('viewer',viewer);
+
+    $( "#camera_pos" ).selectable({
+      selected: function( event, ui ) {
+	$("#camera_pos_del").show();
+	$("#camera_pos_del").data('sel', ui);
+      }
+    });
+
+$("#camera_pos_new").click(function() {
+	var viewer = $("body").data('viewer');
+	var p = viewer.camera.position;
+	p.x = Math.round(p.x*1000)/1000;
+	p.y = Math.round(p.y*1000)/1000;
+	p.z = Math.round(p.z*1000)/1000;
+	$("#camera_pos").append('<li class="ui-widget-content">'+p.x+','+p.y+','+p.z+'</li>');
+	$("#camera_pos").find('li:last').data('camera', [viewer.camera.position.clone(), viewer.cameraControls.center.clone()]);
+});
+$("#camera_pos_del").click(function() {
+	$("#camera_pos").find('.ui-selected').remove();
+});
+$("#camera_pos_run").click(function() {
+	var pos=[];
+	$("#camera_pos").find('li').each(function(){
+		pos.push($(this).data('camera'));
+	});
+	animateCameraPositions(pos.reverse());
+});
+$("#camera_pos_del").hide();
+
+/*$("body").click(function() {
+//animateCameraPositions([{x:1,y:1,z:1},{x:1,y:1,z:1}]);
+animateCameraPositions([{x:1,y:1,z:1},{x:0,y:0,z:0}]);
+//animateCameraPositions([{x:1,y:1,z:1},{x:0,y:0,z:0}]);
+});*/
+  }
+
+function animateCameraPositions(pos) {
+	if(pos.length<1) return;
+
+	var viewer = $("body").data('viewer');
+	var p=pos[pos.length-1];
+	var l=viewer.camera.position;
+	var c=viewer.cameraControls.center;
+
+console.log("animateCameraPositions ", p);
+
+	var tween = new TWEEN.Tween(viewer.camera.position).to(p[1]).easing(TWEEN.Easing.Linear.None).onUpdate(function () {
+		viewer.cameraControls.center = c;
+	}).onComplete(function () {
+		viewer.cameraControls.center = p[1];
+	}).start();
+
+	var tween = new TWEEN.Tween(viewer.camera.position).to(p[0]).easing(TWEEN.Easing.Linear.None).onUpdate(function () {
+		viewer.camera.lookAt(l);
+	}).onComplete(function () {
+		viewer.camera.lookAt(p[0]);
+		pos.pop();
+		animateCameraPositions(pos);
+	}).start();
+}
+</script>
+</head>
+
+<body onload="init()">
+
+<div id="dialog" title="3D Viewer">
+  <div id="markers"></div>
+</div>
+
+<div id="dialog_camera" title="Camera Animation">
+	<ol style="height:45px">
+		<li id="camera_pos_new" class="ui-widget-content" style="float:left;">New</li>
+		<li id="camera_pos_run" class="ui-widget-content" style="float:left;">Run</li>
+		<li id="camera_pos_del" class="ui-widget-content" style="float:left;">Delete</li>
+	</ol>
+	<ol id="camera_pos">
+	</ol>
+</div>
+ 
+</body>
+</html>
