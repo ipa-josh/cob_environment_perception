@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <script type="text/javascript" src="./include/threejs/three.js"></script>
+<!--script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/three.js/r67/three.min.js"></script-->
 <script type="text/javascript" src="./include/EventEmitter2/eventemitter2.js"></script>
 <script type="text/javascript" src="./include/roslibjs/roslib.js"></script>
 <script type="text/javascript" src="./include/build/ros3d.js"></script>
@@ -12,6 +13,9 @@
 <script src="http://code.jquery.com/ui/1.11.0/jquery-ui.js"></script>
 <!--link rel="stylesheet" href="/resources/demos/style.css"-->
 <script src="./include/tween.min.js"></script>
+
+<link rel="stylesheet" href="include/jsoneditor.css">
+<script src="include/jquery.jsoneditor.min.js"></script>
 
 <style>
 ol .ui-selecting { background: #FECA40; }
@@ -27,6 +31,9 @@ ol li { margin: 3px; padding: 0.4em; font-size: 1.4em; height: 18px; }
   function init() {
     $( "#dialog" ).dialog({width: 600, height: 600});
     $( "#dialog_camera" ).dialog({width: 500});
+    $( "#dialog_obj_list" ).dialog();
+    $( "#dialog_capture" ).dialog();
+    $( "#dialog_material" ).dialog({width: 500, maxHeight: 600});
 
     // Connect to ROS.
     var ros = new ROSLIB.Ros({
@@ -59,14 +66,51 @@ ol li { margin: 3px; padding: 0.4em; font-size: 1.4em; height: 18px; }
       rootObject : viewer.scene
     });
 
+function updateObjectList()
+{
+	console.log("updateObjectList");
+	var viewer = $("body").data('viewer');
+	var descendants = viewer.scene.getDescendants();
+	var cont="";
+	for(i in descendants) {
+		if(/*descendants[i].visible &&*/ descendants[i].material)
+			cont+='<li class="ui-widget-content">'+descendants[i].id+'</li>';
+	}
+	$("#obj_list").html(cont);
+	for(i in descendants)
+		$("#obj_list li:nth-child("+i+")").data("obj", descendants[i]);
+}
+
+    viewer.scene.add_ = viewer.scene.add;
+    viewer.scene.add  = function(o) {updateObjectList(); this.add_(o);}
+
     viewer.cameraControls.update_ = viewer.cameraControls.update;
     viewer.cameraControls.update = function() {TWEEN.update();this.update_();}
     $("body").data('viewer',viewer);
+    updateObjectList();
+
+  THREE.EventDispatcher.call(viewer.scene);
+viewer.scene.addEventListener('objectAdded', function(event) {alert("GOT THE EVENT");});
 
     $( "#camera_pos" ).selectable({
       selected: function( event, ui ) {
 	$("#camera_pos_del").show();
 	$("#camera_pos_del").data('sel', ui);
+      }
+    });
+
+    $( "#obj_list" ).selectable({
+      selected: function( event, ui ) {
+	var obj = $("#obj_list").find('.ui-selected').data('obj');
+	obj.old_color = obj.material.color.getHex();
+	$('#editor').jsonEditor(obj.material, {change: function(data) {jQuery.extend(obj.material, data);}});
+	obj.material.color.setHex( 0xffff00 );
+	$( "#obj_list" ).data('old', obj);
+      },
+      unselecting: function( event, ui ) {
+	var obj = $( "#obj_list" ).data('old');
+	console.log(obj);
+	obj.material.color.setHex( obj.old_color );
       }
     });
 
@@ -139,6 +183,18 @@ console.log("animateCameraPositions ", p);
 	</ol>
 	<ol id="camera_pos">
 	</ol>
+</div>
+
+<div id="dialog_obj_list" title="Objects">
+	<ol id="obj_list">
+	</ol>
+</div>
+
+<div id="dialog_material" title="Material">
+	<div id="editor" class="json-editor"></div>
+</div>
+
+<div id="dialog_capture" title="Capture">
 </div>
  
 </body>
