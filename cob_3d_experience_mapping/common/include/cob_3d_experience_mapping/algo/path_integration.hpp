@@ -37,15 +37,14 @@ void init(TGraph &graph, TContext &ctxt, TMapStates &states, TMapTransformations
 {
 	typedef typename TContext::TState TState;
 
-	typename TContext::TState::TPtr state(new TState(ctxt.id_generator().new_id()));
-	state->dist_dev() = 1;
-	ctxt.active_states().push_back(state);
-	insert_state(graph, states, trans, state);
+	ctxt.virtual_state().reset(new TState(ctxt.id_generator().new_id()));
+	ctxt.virtual_state()->dist_dev() = 1;
+	ctxt.active_states().push_back(ctxt.virtual_state());
+	insert_state(graph, states, trans, ctxt.virtual_state());
 	
 	ctxt.ft_new_slot();
-	ctxt.virtual_state() = state;
 	ctxt.virtual_transistion().reset(new TTransformation(ctxt.current_active_state()));
-	ctxt.id_generator().register_modification(state);
+	ctxt.id_generator().register_modification(ctxt.virtual_state());
 
 	//ctxt.virtual_state().reset(new TState);
 	//insert_state<TTransformation>(graph, states, trans, ctxt.virtual_state(), ctxt.current_active_state());
