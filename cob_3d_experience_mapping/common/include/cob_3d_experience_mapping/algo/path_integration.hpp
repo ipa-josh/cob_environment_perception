@@ -55,6 +55,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 	typedef typename TStateVector::iterator TIter;
 	typedef typename TState::TArcOutIterator TArcIter_out;
 	typedef typename TState::TArcInIterator TArcIter_in;
+	typedef typename TState::TLink TLink;
 	
 	boost::lock_guard<boost::mutex> guard(ctxt.get_mutex());	//TODO: reduce locking area
 	
@@ -110,7 +111,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 
 	typename TState::TEnergy dev_increment = ctxt.add_odom(odom.get_data(), odom_derv.get_data());
 	if(ctxt.virtual_state() && ctxt.virtual_transistion()) {		
-		ctxt.virtual_state()->dist_trv() -= 1*dev_increment/ctxt.normalize(odom.get_data()).norm() + 0.9f*(1-ctxt.ft_current_slot_similiarity());
+		ctxt.virtual_state()->set_dist_trv( ctxt.virtual_state()->dist_trv() - 1*dev_increment/ctxt.normalize(odom.get_data()).norm() + 0.9f*(1-ctxt.ft_current_slot_similiarity()) );
 		ctxt.virtual_state()->dist_dev() +=   dev_increment;
 		
 		DBG_PRINTF("%d changing dist V (%f/%f) by (%f, %f)\n", ctxt.virtual_state()->id(), ctxt.virtual_state()->dist_trv(), ctxt.virtual_state()->dist_dev(), dev_increment, (1-ctxt.ft_current_slot_similiarity()));
@@ -210,7 +211,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		}
 			
 		ctxt.virtual_state().reset(new TState(ctxt.id_generator().new_id()));
-		ctxt.virtual_state()->dist_trv()  = 1;
+		ctxt.virtual_state()->reset_dist_trv();
 		ctxt.virtual_state()->dist_dev() = ctxt.current_active_state()->dist_dev() + offset;
 		
 		ctxt.on_new_virtual_state();
@@ -252,106 +253,90 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 			
 			DBG_PRINTF("%d before dist (%f/%f) h:%d\n", (*it)->id(), (*it)->dist_trv(),(*it)->dist_dev(), (*it)->hops());	
 	
-			if( (*it)==ctxt.virtual_state()) {
-				/*const typename TState::TEnergy du = odom.dist_uncertain(ctxt.param().prox_thr_), dc = odom.dist(ctxt.param().prox_thr_);
-				
-				(*it)->dist_trv() =  std::max((typename TState::TEnergy)-1, 1-ctxt.virtual_transistion()->dist(ctxt.param().prox_thr_));
-				(*it)->dist_dev() += (du-dc);
-				
-				DBG_PRINTF("%d changing dist V (%f/%f) by (%f/%f)\n", (*it)->id(), (*it)->dist_trv(),(*it)->dist_dev(), dc, du-dc);*/
-			}
-			else {
+			if( (*it)!=ctxt.virtual_state()) {
 				typename TState::TEnergy dev_min = -1, sim_best = 0, E = 0;
 				
-				//if((*it)->dist_trv()>0)
-				if(1) {
-					for(TArcIter_out ait((*it)->arc_out_begin(graph)); ait!=(*it)->arc_out_end(graph); ++ait) {
-						typename TState::TEnergy sim, dev, rel;
-						trans[ait]->directed(*it).transition_factor2(odom, ctxt.normalization_factor(), ctxt.distance_relation(), sim, dev, rel);
-						
-						//TODO: integrate this directly in transition factor
-						//sim = std::min((typename TState::TEnergy)1, sim+odom.deviation());
-						//dev = std::max((typename TState::TEnergy)0, dev-odom.deviation());
-						//dev *= 0.5f;
-						//dev /= rel+1;
-						
-						if(dev_min<0 || dev<dev_min || (dev_min==dev && sim>sim_best)) {
-							dev_min = dev;
-							sim_best= sim;
-							E = dev_min/trans[ait]->get_data().norm();
-							if(E!=E) E=0;
-						}
+				#if 0
+				for(TArcIter_out ait((*it)->arc_out_begin(graph)); ait!=(*it)->arc_out_end(graph); ++ait) {
+					typename TState::TEnergy sim, dev, rel;
+					trans[ait]->directed(*it).transition_factor2(odom, ctxt.normalization_factor(), ctxt.distance_relation(), sim, dev, rel);
+					
+					//TODO: integrate this directly in transition factor
+					//sim = std::min((typename TState::TEnergy)1, sim+odom.deviation());
+					//dev = std::max((typename TState::TEnergy)0, dev-odom.deviation());
+					//dev *= 0.5f;
+					//dev /= rel+1;
+					
+					if(dev_min<0 || dev<dev_min || (dev_min==dev && sim>sim_best)) {
+						dev_min = dev;
+						sim_best= sim;
+						E = dev_min/trans[ait]->get_data().norm();
+						if(E!=E) E=0;
 					}
-					
-					if((*it)->dist_trv()<0) {
-						E/=10;
-						//E = E / ctxt.distance_relation();
-						for(TArcIter_in ait((*it)->arc_in_begin(graph)); ait!=(*it)->arc_in_end(graph); ++ait) {
-							typename TIter::value_type opposite = states[(*it)->opposite_node(graph, ait)];
-							if( !opposite->is_active() || opposite == ctxt.virtual_state() || opposite->dist_trv()<0 ) continue;
-							
-							DBG_PRINTF("dist_trv_var bef %f\n", opposite->dist_trv_var());
-							opposite->dist_trv_var() = std::sqrt(1/(1/(opposite->dist_trv_var()*opposite->dist_trv_var()) + E*E));
-							DBG_PRINTF("dist_trv_var aft %f\n", opposite->dist_trv_var());
-						}
-					}
-					if(dev_min<0) {
-						dev_min = ctxt.normalize(odom.get_data()).norm();
-					}
-					
-					(*it)->dist_trv() -= sim_best/*+dev_min+odom.deviation()*/;
-					(*it)->dist_trv_var() += dev_min;
-					
-					//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/(typename TState::TEnergy)active_states.size());
-					//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), std::sqrt((typename TState::TEnergy)(*it)->hops()));
-					//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/(typename TState::TEnergy)active_states.size());
-					//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/std::sqrt((typename TState::TEnergy)active_states.size()));
-					typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops());
-					if((*it)->dist_trv()<0) R=1;
-					//(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*(2*R-1) );
-					(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*R );
-					
-					DBG_PRINTF("%d changing dist(%f/%f) %f, %f, %f with R=%f\n", (*it)->id(),
-						(*it)->dist_trv(),(*it)->dist_dev(), dev_min, dev_increment, sim_best, R);
 				}
-				else {
-					/*if( (*it)->id() < ctxt.virtual_state()->id()-ctxt.param().min_age_ && (*it)->get_feature_prob()>0)
-						odom.dbg();
-						
+				
+				if((*it)->dist_trv()<0) {
+					//E = E / ctxt.distance_relation();
 					for(TArcIter_in ait((*it)->arc_in_begin(graph)); ait!=(*it)->arc_in_end(graph); ++ait) {
-						tmp = trans[ait]->directed(*it).transition_factor(odom, ctxt.param().prox_thr_);
-						if(dh_max<tmp) {
-							dh_max = tmp;
-							dev_max= trans[ait]->deviation();
-						}
+						typename TIter::value_type opposite = states[(*it)->opposite_node(graph, ait)];
+						if( !opposite->is_active() || opposite == ctxt.virtual_state() || opposite->dist_trv()<0 ) continue;
 						
-						if( (*it)->id() < ctxt.virtual_state()->id()-ctxt.param().min_age_ && (*it)->get_feature_prob()>0) {
-							trans[ait]->directed(*it).dbg();
-							std::cout<<"t-factor2: "<<trans[ait]->directed(*it).transition_factor(odom, ctxt.param().prox_thr_)<<std::endl;
-							
-							/*typename TIter::value_type opposite = states[(*it)->opposite_node(graph, ait)];
-							trans[ait]->directed(opposite).dbg();
-							std::cout<<"t-factor: "<<trans[ait]->directed(opposite).transition_factor(odom, ctxt.param().prox_thr_)<<std::endl;*
-						}
-					}*/
-					
-					dev_min = ctxt.normalize(odom.get_data()).norm();// /ctxt.distance_relation();
-					if(dev_min!=dev_min) dev_min = 0;
-					
-					(*it)->dist_trv() -= dev_min;//odom.dist(ctxt.param().prox_thr_);
-					//dev_min = std::max(dev_min, dev_increment);
-					dev_min = dev_increment;
-					
-					(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment );
+						DBG_PRINTF("dist_trv_var bef %f\n", opposite->dist_trv_var());
+						opposite->dist_trv_var() = std::sqrt(1/(1/(opposite->dist_trv_var()*opposite->dist_trv_var()) + E*E));
+						DBG_PRINTF("dist_trv_var aft %f\n", opposite->dist_trv_var());
+					}
 				}
-				//dev_min = dev_increment;//TODO: just for testing
+				if(dev_min<0) {
+					dev_min = ctxt.normalize(odom.get_data()).norm();
+				}
 				
-				//(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dist + odom.deviation()*(2*std::exp(-5*(*it)->hops()/(float)active_states.size())-1) );
-				//(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min + dev_increment*(2*std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops())-1) );
-				//(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min + dev_increment*std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()) );
+				(*it)->dist_trv() -= sim_best/*+dev_min+odom.deviation()*/;
+				#else
+				TLink bef = (*it)->travel();
+				const TLink &trv = (*it)->travel(odom);
+				for(TArcIter_out ait((*it)->arc_out_begin(graph)); ait!=(*it)->arc_out_end(graph); ++ait) {
+					typename TState::TEnergy simb, devb, relb;
+					typename TState::TEnergy sim, dev, rel;
+					
+					trans[ait]->directed(*it).transition_factor2(bef, ctxt.normalization_factor(), ctxt.distance_relation(), simb, devb, relb);
+					
+					trans[ait]->directed(*it).transition_factor2(trv, ctxt.normalization_factor(), ctxt.distance_relation(), sim, dev, rel);
+					
+					dev -= devb;
+					
+					if(dev_min<0 || dev<dev_min || (dev_min==dev && sim>sim_best)) {
+						dev_min = dev;
+						sim_best= sim;
+						E = dev_min/trans[ait]->get_data().norm();
+						if(E!=E) E=0;
+					}
+				}
 				
-				//DBG_PRINTF("%d changing dist(%f/%f) %f, %f, %f with R=%f\n", (*it)->id(),
-				//	(*it)->dist_trv(),(*it)->dist_dev(), dev_min, dev_increment, sim_best, 1.f/*R*/);
+				if((*it)->dist_trv()<0) {
+					//E = E / ctxt.distance_relation();
+					for(TArcIter_in ait((*it)->arc_in_begin(graph)); ait!=(*it)->arc_in_end(graph); ++ait) {
+						typename TIter::value_type opposite = states[(*it)->opposite_node(graph, ait)];
+						if( !opposite->is_active() || opposite == ctxt.virtual_state() || opposite->dist_trv()<0 ) continue;
+						
+						DBG_PRINTF("dist_trv_var bef %f\n", opposite->dist_trv_var());
+						opposite->dist_trv_var() = std::sqrt(1/(1/(opposite->dist_trv_var()*opposite->dist_trv_var()) + E*E));
+						DBG_PRINTF("dist_trv_var aft %f\n", opposite->dist_trv_var());
+					}
+				}
+				#endif
+				(*it)->dist_trv_var() += dev_min;
+				
+				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/(typename TState::TEnergy)active_states.size());
+				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), std::sqrt((typename TState::TEnergy)(*it)->hops()));
+				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/(typename TState::TEnergy)active_states.size());
+				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/std::sqrt((typename TState::TEnergy)active_states.size()));
+				typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops());
+				if((*it)->dist_trv()<0) R=1;
+				//(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*(2*R-1) );
+				(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*R );
+				
+				DBG_PRINTF("%d changing dist(%f/%f) %f, %f, %f with R=%f\n", (*it)->id(),
+					(*it)->dist_trv(),(*it)->dist_dev(), dev_min, dev_increment, sim_best, R);
 			}
 			
 			assert( (*it)->dist_trv()==(*it)->dist_trv() );
@@ -417,7 +402,8 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					to_be_added.push_back(opposite);
 					
 					if(!opposite->is_active() || (*it)->dist_trv_var()<opposite->dist_trv_var()) {
-						opposite->dist_trv() = std::min((typename TState::TEnergy)1, 1+(*it)->dist_trv());
+						//TODO: opposite->dist_trv() = std::min((typename TState::TEnergy)1, 1+(*it)->dist_trv());
+						opposite->reset_dist_trv();
 						opposite->dist_trv_var() = (*it)->dist_trv_var();
 					}
 					//opposite->dist_trv()  = std::min((typename TState::TEnergy)1, std::max((typename TState::TEnergy)-1, trans[ait]->dist(ctxt.param().prox_thr_)+(*it)->dist_trv()));

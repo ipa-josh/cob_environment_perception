@@ -99,6 +99,7 @@ namespace cob_3d_experience_mapping {
 		bool still_exists_;	//!< flag: false if removed from map completely
 		bool is_active_;	//!< flag: true if present in active state list
 		bool seen_;
+		TLink trv_;
 		
 	public:		
 		State(): dist_dev_(0), dist_trv_(0), dist_trv_var_(1), ft_imp_(1), id_(-1), hops_(0), still_exists_(true), is_active_(false), seen_(false) {
@@ -142,9 +143,24 @@ namespace cob_3d_experience_mapping {
 		inline const TEnergy &dist_dev() const {return dist_dev_;}
 		
 		//!< setter/getter for travel distance
-		inline TEnergy &dist_trv() {return dist_trv_;}
+		//inline TEnergy &dist_trv() {return dist_trv_;}
+		inline void set_dist_trv(const TEnergy &t) {dist_trv_=t;}
 		//!< getter for travel distance
 		inline const TEnergy &dist_trv() const {return dist_trv_;}
+		
+		inline void reset_dist_trv() {
+			dist_trv_ = 0;
+			trv_ = TLink();
+		}
+		
+		inline const TLink &travel() const {
+			return trv_;
+		}
+		
+		inline const TLink &travel(const TLink &movement) {
+			trv_.integrate(movement);
+			return trv_;
+		}
 		
 		inline void merge_trv(const TEnergy &pos, const TEnergy &var) {
 			dist_trv_ 		= (var*var*dist_trv_ + dist_trv_var_*dist_trv_var_*pos) / (var*var+dist_trv_var_*dist_trv_var_);

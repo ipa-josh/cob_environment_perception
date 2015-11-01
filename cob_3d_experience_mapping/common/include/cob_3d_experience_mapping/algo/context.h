@@ -345,7 +345,7 @@ namespace cob_3d_experience_mapping {
 			if(!already_set) {
 				state->dist_dev() 	= virtual_state()->dist_dev()+initial_distance();
 				state->hops() 		= 0;
-				state->dist_trv()  		= 1;	//we are approaching state (assume half way)
+				state->reset_dist_trv();	//we are approaching state (assume half way)
 				state->dist_trv_var()  	= 1;
 			}
 			
