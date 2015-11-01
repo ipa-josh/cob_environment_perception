@@ -307,7 +307,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					
 					trans[ait]->directed(*it).transition_factor2(trv, ctxt.normalization_factor(), ctxt.distance_relation(), sim, dev, rel);
 					
-					DBG_PRINTF("%f   %f %f\n",sim, dev, devb);
+					DBG_PRINTF("SIM %f   %f %f\n",sim, dev, devb);
 						
 					dev -= devb;
 					
@@ -318,6 +318,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 						if(E!=E) E=0;
 					}
 				}
+				(*it)->set_dist_trv(1-sim_best);
 				
 				if((*it)->dist_trv()<0) {
 					//E = E / ctxt.distance_relation();
