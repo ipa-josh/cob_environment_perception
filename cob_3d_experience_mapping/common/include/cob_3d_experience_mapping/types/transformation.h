@@ -78,6 +78,11 @@ namespace cob_3d_experience_mapping {
 			//_DEVIATION += movement._DEVIATION;
 		}
 		
+		TransformationLink &operator*=(const TType &f) {
+			link_ *= f;
+			return *this;
+		}
+		
 		inline Eigen::Matrix<TType, NUM_TRANS, 1> translation() const {return link_.template head<NUM_TRANS>();}
 		inline Eigen::Matrix<TType, NUM_ROT, 1> rotation() const {return link_.template tail<NUM_ROT>();}
 		

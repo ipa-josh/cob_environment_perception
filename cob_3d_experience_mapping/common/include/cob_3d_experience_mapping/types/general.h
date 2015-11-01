@@ -149,7 +149,7 @@ namespace cob_3d_experience_mapping {
 		inline const TEnergy &dist_trv() const {return dist_trv_;}
 		
 		inline void reset_dist_trv() {
-			dist_trv_ = 0;
+			dist_trv_ = 1;
 			trv_ = TLink();
 		}
 		
@@ -163,7 +163,9 @@ namespace cob_3d_experience_mapping {
 		}
 		
 		inline void merge_trv(const TEnergy &pos, const TEnergy &var) {
-			dist_trv_ 		= (var*var*dist_trv_ + dist_trv_var_*dist_trv_var_*pos) / (var*var+dist_trv_var_*dist_trv_var_);
+			const TEnergy t	= (var*var*dist_trv_ + dist_trv_var_*dist_trv_var_*pos) / (var*var+dist_trv_var_*dist_trv_var_);
+			trv_ 		   *= t/dist_trv_;
+			dist_trv_ 		= t;
 			dist_trv_var_ 	= std::sqrt(1/(1/(dist_trv_var_*dist_trv_var_) + 1/(var*var)));
 		}
 		

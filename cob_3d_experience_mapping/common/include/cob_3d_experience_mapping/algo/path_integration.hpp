@@ -42,6 +42,9 @@ void init(TGraph &graph, TContext &ctxt, TMapStates &states, TMapTransformations
 	ctxt.active_states().push_back(state);
 	insert_state(graph, states, trans, state);
 	
+	ctxt.ft_new_slot();
+	ctxt.virtual_state() = state;
+	ctxt.virtual_transistion().reset(new TTransformation(ctxt.current_active_state()));
 	ctxt.id_generator().register_modification(state);
 
 	//ctxt.virtual_state().reset(new TState);
@@ -143,6 +146,9 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 			DBG_PRINTF("tr  vec %f \t%f\n", ctxt.virtual_transistion()->get_data()(0), ctxt.virtual_transistion()->get_data()(2));
 #endif
 			exchange_active_state = true;
+			
+			active_states[0]->is_active() = false;
+			active_states[0]->hops() = 0;
 		}
 		else {
 			//if(ctxt.last_active_state())
@@ -302,6 +308,8 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					
 					trans[ait]->directed(*it).transition_factor2(trv, ctxt.normalization_factor(), ctxt.distance_relation(), sim, dev, rel);
 					
+					DBG_PRINTF("%f   %f %f\n",sim, dev, devb);
+						
 					dev -= devb;
 					
 					if(dev_min<0 || dev<dev_min || (dev_min==dev && sim>sim_best)) {
