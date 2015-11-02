@@ -5,6 +5,7 @@
 #include <ratslam_ros/TopologicalAction.h>
 #include <std_msgs/Int32.h>
 #include <Eigen/Geometry> 
+#include <gtest/gtest_prod.h>
 
 class As_Node
 {
@@ -47,6 +48,8 @@ public:
 template <typename Parent, int NUM_TRANS=2, int NUM_ROT=1, typename _Scalar=float>
 class ROS_Node : public Parent
 {
+	FRIEND_TEST(experience_mapping_lemon, straight);
+	
 public:
 	typedef int TID;
 	typedef int TFeatureClass;

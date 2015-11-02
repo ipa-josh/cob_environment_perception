@@ -227,3 +227,10 @@ target_link_libraries(local_path_planning
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+
+catkin_add_gtest(unit_tests src/unit_tests.cpp)
+
+target_link_libraries(unit_tests
+  ${catkin_LIBRARIES}
+)
