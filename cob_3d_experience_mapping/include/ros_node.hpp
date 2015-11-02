@@ -48,7 +48,9 @@ public:
 template <typename Parent, int NUM_TRANS=2, int NUM_ROT=1, typename _Scalar=float>
 class ROS_Node : public Parent
 {
+	FRIEND_TEST(experience_mapping_lemon, init);
 	FRIEND_TEST(experience_mapping_lemon, straight);
+	FRIEND_TEST(experience_mapping_lemon, random_walk);
 	
 public:
 	typedef int TID;
