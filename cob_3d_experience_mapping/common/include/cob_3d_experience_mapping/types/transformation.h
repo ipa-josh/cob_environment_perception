@@ -47,6 +47,9 @@ namespace cob_3d_experience_mapping {
 		TransformationLink() : link_(TLink::Zero()), deviation_(TLink::Zero())
 		{}
 		
+		TransformationLink(const TLink &link) : link_(link), deviation_(TLink::Zero())
+		{}
+		
 		
 		inline const TLink &get_data() const {return link_;}
 		
@@ -168,7 +171,7 @@ namespace cob_3d_experience_mapping {
 				sim =  tmp1.dot( -tmp2 )/tmp1.squaredNorm();
 				dev = std::sqrt( std::max((TType)0, tmp2.squaredNorm() - sim*tmp1.dot( -tmp2 )) );
 				
-				if(sim>1) sim = 1-sim;
+				//if(sim>1) sim = 1-sim;
 				sim = std::max((TType)0, sim);
 				rel = sim*tmp1.norm()/tmp2.norm();
 				
@@ -177,7 +180,7 @@ namespace cob_3d_experience_mapping {
 				DBG_PRINTF("error1 %f (allowed %f %f)   \t%f %f\n", dev, (dev1*tmp2.norm()/tmp1.norm())(0), (dev1*tmp2.norm()/tmp1.norm())(2), er(0), er(2));
 				
 				//er-= dev1*tmp2.norm()/tmp1.norm();
-				er-= dev1*tmp2.norm();
+				er-= dev1;//*tmp2.norm();
 				
 				//er-= tmp2.cwiseAbs()*0.1f;
 				er = er.cwiseMax(TLink::Zero());
