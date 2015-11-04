@@ -118,8 +118,6 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		
 		DBG_PRINTF("%d changing dist V (%f/%f) by (%f, %f)\n", ctxt.virtual_state()->id(), ctxt.virtual_state()->dist_trv(), ctxt.virtual_state()->dist_dev(), dev_increment, (1-ctxt.ft_current_slot_similiarity()));
 	}
-	
-	ctxt.ft_new_slot();
 
 	if(!ctxt.virtual_state() || (ctxt.last_active_state()!=ctxt.current_active_state() && ctxt.current_active_state()->dist_trv()<=0) || (ctxt.current_active_state()!=ctxt.virtual_state() && ctxt.current_active_state()->dist_dev()<ctxt.last_dist_min() && ctxt.current_active_state()->dist_trv()<=0) || ctxt.virtual_state()->dist_trv()<=0 || ctxt.current_active_state()->dist_trv()<=-1) {
 		
@@ -238,6 +236,8 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		else
 			active_states.push_back(ctxt.virtual_state());
 	}
+	
+	ctxt.ft_new_slot();
 	
 	ctxt.last_dist_min() = ctxt.current_active_state()->dist_dev();
 	
