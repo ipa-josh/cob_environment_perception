@@ -402,7 +402,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 				if( /*ctxt.distance_relation()trans[ait]->deviation()*/ opposite == ctxt.virtual_state() ) continue;
 				
 				if( trans[ait]!=ctxt.virtual_transistion() && 
-					(   (!opposite->is_active()&& (/*opposite->seen()||*/(*it)->dist_dev()<ctxt.virtual_state()->dist_dev()+3*ctxt.distance_sum())/*+ctxt.param().deviation_factor_*(*it)->hops()*/)
+					(   (!opposite->is_active()&& (/*opposite->seen()||*/(*it)->dist_dev()<ctxt.virtual_state()->dist_dev()+3*ctxt.initial_distance())/*+ctxt.param().deviation_factor_*(*it)->hops()*/)
 					 || ( opposite->is_active()&& opposite->dist_dev() > (*it)->dist_dev()/*&&(*it)->dist_trv_var()<opposite->dist_trv_var()*/) )
 					//&& trans[ait]->directed(*it).transition_factor(odom, ctxt.param().prox_thr_)>odom.deviation()
 					/*std::pow(trans[ait]->dist(ctxt.param().prox_thr_),2) + std::pow(opposite->dist_dev(),2)
