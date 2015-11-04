@@ -310,6 +310,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					DBG_PRINTF("SIM %f   %f %f\n",sim, dev, devb);
 						
 					dev -= devb;
+					if(dev<0) dev = 0;
 					
 					if(dev_min<0 || dev<dev_min || (dev_min==dev && sim>sim_best)) {
 						dev_min = dev;
