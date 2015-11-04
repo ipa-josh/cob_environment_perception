@@ -164,7 +164,11 @@ namespace cob_3d_experience_mapping {
 		
 		inline void merge_trv(const TEnergy &pos, const TEnergy &var) {
 			const TEnergy t	= (var*var*dist_trv_ + dist_trv_var_*dist_trv_var_*pos) / (var*var+dist_trv_var_*dist_trv_var_);
-			trv_ 		   *= t/dist_trv_;
+			
+			DBG_PRINTF("state %d: merge %f\n", id(), (1-t)/(1-dist_trv_));
+			assert(t>=dist_trv_);
+			
+			if(dist_trv_!=1) trv_ 		   *= (1-t)/(1-dist_trv_);
 			dist_trv_ 		= t;
 			dist_trv_var_ 	= std::sqrt(1/(1/(dist_trv_var_*dist_trv_var_) + 1/(var*var)));
 		}
