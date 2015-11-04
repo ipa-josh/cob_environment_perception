@@ -118,6 +118,7 @@ namespace cob_3d_experience_mapping {
 				if(dev_sum>0) relation = dev_sum/sim_sum;
 				if(relation!=relation || std::isinf(relation)) relation=0;
 				w = 1;//relation/distance_relation();
+				distance_distance_sum_ += w*sim_sum;
 				distance_relation_sum_ += w*relation;
 				distance_relation_num_ += w;
 			}
@@ -191,7 +192,7 @@ namespace cob_3d_experience_mapping {
 		FeatureBuffer last_features_;
 		boost::mutex mtx_;
 		bool needs_sort_;
-		TEnergy distance_relation_sum_, distance_relation_num_;
+		TEnergy distance_relation_sum_, distance_distance_sum_, distance_relation_num_;
 		
 		typename TTransform::TLink action_sum_, action_num_;
 		std::vector<typename TTransform::TLink> action_seq_;
@@ -201,7 +202,7 @@ namespace cob_3d_experience_mapping {
 		Context() : last_dist_min_(0), last_features_(10), needs_sort_(true) {
 			action_num_.fill(0);
 			action_sum_.fill(0);
-			distance_relation_sum_ = distance_relation_num_ = 0;
+			distance_distance_sum_ = distance_relation_sum_ = distance_relation_num_ = 0;
 			
 			/*action_num_(0) = 20;
 			action_num_(2) = 20;
@@ -212,13 +213,18 @@ namespace cob_3d_experience_mapping {
 		}
 		
 		inline TEnergy initial_distance() const {
-			return distance_relation();
+			return distance_relation();//distance_sum()*0.25f + distance_relation()*0.75f;
 		}
 		
 		//TEnergy distance_relation() const {return distance_relation_;}
 		TEnergy distance_relation() const {
 			if(!distance_relation_num_) return 1;
 			return distance_relation_sum_/distance_relation_num_;
+		}
+		
+		TEnergy distance_sum() const {
+			if(!distance_relation_num_) return 1;
+			return distance_distance_sum_/distance_relation_num_;
 		}
 		
 		//!< check if sorting is needed (because feature was seen) and resets flag
