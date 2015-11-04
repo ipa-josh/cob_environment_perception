@@ -148,9 +148,9 @@ namespace cob_3d_experience_mapping {
 		//!< getter for travel distance
 		inline const TEnergy &dist_trv() const {return dist_trv_;}
 		
-		inline void reset_dist_trv() {
-			dist_trv_ = 1;
-			trv_ = TLink();
+		inline void reset_dist_trv(const TLink &trv=TLink(), const TEnergy &dist=1) {
+			dist_trv_ = dist;
+			trv_ = trv;
 		}
 		
 		inline const TLink &travel() const {
