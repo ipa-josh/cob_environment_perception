@@ -64,7 +64,7 @@ namespace cob_3d_experience_mapping {
 		typedef boost::circular_buffer<typename TFeature::TID> FeatureBuffer;
 		
 		typedef std::vector<typename TFeature::TID> FeaturePerceivedSet;
-		typedef std::vector<FeaturePerceivedSet> FeaturePerceivedHistory;
+		typedef std::deque<FeaturePerceivedSet> FeaturePerceivedHistory;
 		
 		static bool ft_perceived_in(const typename TFeature::TID &ft_id, const FeaturePerceivedSet &slot) {
 			for(size_t i=0; i<slot.size(); i++)
@@ -170,7 +170,14 @@ namespace cob_3d_experience_mapping {
 		
 		void ft_new_slot() {
 			if(ft_slots_.size()<1 || ft_slots_.front().size()>0)
-				ft_slots_.insert(ft_slots_.begin(), FeaturePerceivedSet());
+				ft_slots_.push_front(FeaturePerceivedSet());
+				
+			/*DBG_PRINTF("ft_new_slot:\n");
+			for(size_t i=0; i<ft_slots_.size(); i++) {
+				DBG_PRINTF("\tft slot %d:", (int)i);
+				for(size_t j=0; j<ft_slots_[i].size(); j++) DBG_PRINTF("\t%d", ft_slots_[i][j]);
+				DBG_PRINTF("\n");
+			}*/
 		}
 		
 	private:
@@ -233,6 +240,13 @@ namespace cob_3d_experience_mapping {
 			if(ft_slots_.size()>1) {	//keep current set
 				ft_slots_.erase(ft_slots_.begin()+1, ft_slots_.end());
 			}
+				
+			/*DBG_PRINTF("on_new_virtual_state:\n");
+			for(size_t i=0; i<ft_slots_.size(); i++) {
+				DBG_PRINTF("\tft slot %d:", (int)i);
+				for(size_t j=0; j<ft_slots_[i].size(); j++) DBG_PRINTF("\t%d", ft_slots_[i][j]);
+				DBG_PRINTF("\n");
+			}*/
 		}
 		
 		TEnergy add_odom(const typename TTransform::TLink &odom, const typename TTransform::TLink &odom_derv) {
