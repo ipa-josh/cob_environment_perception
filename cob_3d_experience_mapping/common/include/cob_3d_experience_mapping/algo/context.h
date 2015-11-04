@@ -92,10 +92,10 @@ namespace cob_3d_experience_mapping {
 		}
 		
 		TEnergy ft_chance_to_see(const typename TFeature::TID &ft_id) {
-			float num=0;
+			int num=0;
 			for(size_t i=1; i<ft_slots_.size(); i++)
 				if(ft_perceived_in(ft_id, ft_slots_[i]))
-					num += (float)(i-1)*2/((ft_slots_.size()-1)*(ft_slots_.size()-2));
+					++num;
 			return num/(TEnergy)(ft_slots_.size()-1);
 		}
 		
@@ -140,10 +140,10 @@ namespace cob_3d_experience_mapping {
 				for(size_t j=0; j<ft_slots_[i].size(); j++) {
 					if(did_already.find(ft_slots_[i][j])!=did_already.end()) continue;
 					
-					const TEnergy prob = ft_chance_to_see(ft_slots_[i][j]);
+					const TEnergy prob = ft_chance_to_see(ft_slots_[i][j]) * (0.5f + (float)(i-1)/((ft_slots_.size()-1)*ft_slots_.size()));
 					did_already[ft_slots_[i][j]] = true;
 				
-					DBG_PRINTF("ft prob %f", prob);
+					DBG_PRINTF("ft prob %f\n", prob);
 					
 					if(prob>=0.5) {
 						features_[ft_slots_[i][j]]->visited(current_active_state().get(), current_active_state());
