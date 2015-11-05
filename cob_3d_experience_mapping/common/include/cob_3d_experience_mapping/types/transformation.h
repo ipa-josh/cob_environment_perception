@@ -212,8 +212,8 @@ namespace cob_3d_experience_mapping {
 			DBG_PRINTF("dev %f %f\n", dev1(0), dev1(2));
 			DBG_PRINTF("link %f %f\n", tmp1(0), tmp1(2));
 			DBG_PRINTF("odom %f %f\n", tmp2(0), tmp2(2));
-			DBG_PRINTF("link %f %f\n", link_(0), link_(2));
-			DBG_PRINTF("odom %f %f\n", o.link_(0), o.link_(2));
+			DBG_PRINTF("link %f %f %f\n", link_(0), link_(1), link_(2));
+			DBG_PRINTF("odom %f %f %f\n", o.link_(0), o.link_(1), o.link_(2));
 			DBG_PRINTF("tr f2 %f %f %f\t\t\t%f %f %f (f: %f)\n", sim, dev, rel, link_(0), link_(2), deviation().norm(), (relation_factor/dev1.norm()));
 		}
 		
