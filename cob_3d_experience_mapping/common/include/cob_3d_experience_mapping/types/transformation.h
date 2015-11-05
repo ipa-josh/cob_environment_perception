@@ -180,7 +180,8 @@ namespace cob_3d_experience_mapping {
 				
 				DBG_PRINTF("error1 %f (allowed %f %f)   \t%f %f\n", dev, (dev1*tmp2.norm()/tmp1.norm())(0), (dev1*tmp2.norm()/tmp1.norm())(2), er(0), er(2));
 				
-				rel = er.sum();
+				rel = (er-deviation_.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum();
+				//rel = std::min(rel, (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum());
 				
 				//er-= dev1*tmp2.norm()/tmp1.norm();
 				er-= dev1;//*tmp2.norm();
