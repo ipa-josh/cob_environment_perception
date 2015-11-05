@@ -361,6 +361,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 			
 			assert( (*it)->dist_trv()==(*it)->dist_trv() );
 			assert( (*it)->dist_dev()==(*it)->dist_dev() );
+			assert( (*it)->dist_trv_var()==(*it)->dist_trv_var() );
 		}
 	}
 	
