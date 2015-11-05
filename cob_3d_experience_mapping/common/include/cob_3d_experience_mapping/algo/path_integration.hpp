@@ -307,15 +307,15 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 				TLink bef = (*it)->travel();
 				const TLink &trv = (*it)->travel(odom);
 				
-				for(TArcIter_in ait((*it)->arc_in_begin(graph)); ait!=(*it)->arc_in_end(graph); ++ait) {
-						typename TIter::value_type opposite = states[(*it)->opposite_node(graph, ait)];
-				//for(TArcIter_out ait((*it)->arc_out_begin(graph)); ait!=(*it)->arc_out_end(graph); ++ait) {
+				//for(TArcIter_in ait((*it)->arc_in_begin(graph)); ait!=(*it)->arc_in_end(graph); ++ait) {
+				//		typename TIter::value_type opposite = states[(*it)->opposite_node(graph, ait)];
+				for(TArcIter_out ait((*it)->arc_out_begin(graph)); ait!=(*it)->arc_out_end(graph); ++ait) {
 					typename TState::TEnergy simb, devb, relb;
 					typename TState::TEnergy sim, dev, rel;
 					
-					trans[ait]->directed(opposite).transition_factor2(bef, ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), simb, devb, relb);
+					trans[ait]->directed(*it).transition_factor2(bef, ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), simb, devb, relb);
 					
-					trans[ait]->directed(opposite).transition_factor2(trv, ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), sim, dev, rel);
+					trans[ait]->directed(*it).transition_factor2(trv, ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), sim, dev, rel);
 					
 					DBG_PRINTF("SIM %f   %f %f\n",sim, dev, devb);
 						
