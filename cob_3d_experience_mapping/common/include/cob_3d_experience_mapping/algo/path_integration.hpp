@@ -222,7 +222,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		typename TState::TEnergy old_dev = ctxt.virtual_state()->dist_dev();
 		ctxt.virtual_state().reset(new TState(ctxt.id_generator().new_id()));
 		ctxt.virtual_state()->reset_dist_trv();
-		ctxt.virtual_state()->dist_dev() = old_dev;//ctxt.current_active_state()->dist_dev() + offset;
+		ctxt.virtual_state()->dist_dev() = std::min(old_dev, ctxt.current_active_state()->dist_dev()+ctxt.distance_sum());//ctxt.current_active_state()->dist_dev() + offset;
 		
 		ctxt.on_new_virtual_state();
 		
