@@ -351,7 +351,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/(typename TState::TEnergy)active_states.size());
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/std::sqrt((typename TState::TEnergy)active_states.size()));
 				typename TState::TEnergy R = std::pow(1-(1-(*it)->dist_trv_var())/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/std::sqrt((typename TState::TEnergy)active_states.size()));
-				if((*it)->dist_trv()<0) R=1;
+				if((*it)->dist_trv()<-(*it)->dist_trv_var()) R=1;
 				//(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*(2*R-1) );
 				(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*R );
 				
