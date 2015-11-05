@@ -162,22 +162,25 @@ namespace cob_3d_experience_mapping {
 			
 			//assert(er.norm() <= 2*o.link_.norm()+0.00001f);
 		}
-		void transition_factor2(const TransformationLink &o, const TLink &thr, const TType relation_factor, TType &sim, TType &dev, TType &rel) const {
+		void transition_factor2(const TransformationLink &o, const TLink &thr, const TLink &general_deviation, const TType relation_factor, TType &sim, TType &dev, TType &rel) const {
 			TLink tmp1 =   link_.cwiseProduct(thr.cwiseInverse());
 			TLink tmp2 = o.link_.cwiseProduct(thr.cwiseInverse());
-			TLink dev1 = deviation_.cwiseProduct(thr.cwiseInverse());
+			TLink dev1 = deviation_.cwiseProduct(thr.cwiseInverse()) + general_deviation.cwiseProduct(thr.cwiseInverse());
 			
 			if(tmp1.squaredNorm()) {
 				sim =  tmp1.dot( -tmp2 )/tmp1.squaredNorm();
 				dev = std::sqrt( std::max((TType)0, tmp2.squaredNorm() - sim*tmp1.dot( -tmp2 )) );
 				
 				//if(sim>1) sim = 1-sim;
-				sim = std::max((TType)0, sim);
-				rel = sim*tmp1.norm()/tmp2.norm();
+				sim = std::min((TType)2, std::max((TType)0, sim));
+				//sim = std::min((TType)10, std::max((TType)0, sim));
+				//rel = sim*tmp1.norm()/tmp2.norm();
 				
 				TLink er = (tmp2+sim*tmp1).cwiseAbs();
 				
 				DBG_PRINTF("error1 %f (allowed %f %f)   \t%f %f\n", dev, (dev1*tmp2.norm()/tmp1.norm())(0), (dev1*tmp2.norm()/tmp1.norm())(2), er(0), er(2));
+				
+				rel = er.sum();
 				
 				//er-= dev1*tmp2.norm()/tmp1.norm();
 				er-= dev1;//*tmp2.norm();

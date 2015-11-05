@@ -213,9 +213,10 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 			remove_state(graph, ctxt.virtual_state());
 		}
 			
+		typename TState::TEnergy old_dev = ctxt.virtual_state()->dist_dev();
 		ctxt.virtual_state().reset(new TState(ctxt.id_generator().new_id()));
 		ctxt.virtual_state()->reset_dist_trv();
-		ctxt.virtual_state()->dist_dev() = ctxt.current_active_state()->dist_dev() + offset;
+		ctxt.virtual_state()->dist_dev() = old_dev;//ctxt.current_active_state()->dist_dev() + offset;
 		
 		ctxt.on_new_virtual_state();
 		
@@ -259,12 +260,12 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 			DBG_PRINTF("%d before dist (%f/%f) h:%d\n", (*it)->id(), (*it)->dist_trv(),(*it)->dist_dev(), (*it)->hops());	
 	
 			if( (*it)!=ctxt.virtual_state()) {
-				typename TState::TEnergy dev_min = -1, sim_best = 0, E = 0;
+				typename TState::TEnergy dev_min = -1, sim_best = 0, E = 0, rel_best=0;
 				
 				#if 0
 				for(TArcIter_out ait((*it)->arc_out_begin(graph)); ait!=(*it)->arc_out_end(graph); ++ait) {
 					typename TState::TEnergy sim, dev, rel;
-					trans[ait]->directed(*it).transition_factor2(odom, ctxt.normalization_factor(), ctxt.distance_relation(), sim, dev, rel);
+					trans[ait]->directed(*it).transition_factor2(odom, ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), sim, dev, rel);
 					
 					//TODO: integrate this directly in transition factor
 					//sim = std::min((typename TState::TEnergy)1, sim+odom.deviation());
@@ -300,22 +301,28 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 				TLink bef = (*it)->travel();
 				const TLink &trv = (*it)->travel(odom);
 				
-				for(TArcIter_out ait((*it)->arc_out_begin(graph)); ait!=(*it)->arc_out_end(graph); ++ait) {
+				for(TArcIter_in ait((*it)->arc_in_begin(graph)); ait!=(*it)->arc_in_end(graph); ++ait) {
+						typename TIter::value_type opposite = states[(*it)->opposite_node(graph, ait)];
+				//for(TArcIter_out ait((*it)->arc_out_begin(graph)); ait!=(*it)->arc_out_end(graph); ++ait) {
 					typename TState::TEnergy simb, devb, relb;
 					typename TState::TEnergy sim, dev, rel;
 					
-					trans[ait]->directed(*it).transition_factor2(bef, ctxt.normalization_factor(), ctxt.distance_relation(), simb, devb, relb);
+					trans[ait]->directed(opposite).transition_factor2(bef, ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), simb, devb, relb);
 					
-					trans[ait]->directed(*it).transition_factor2(trv, ctxt.normalization_factor(), ctxt.distance_relation(), sim, dev, rel);
+					trans[ait]->directed(opposite).transition_factor2(trv, ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), sim, dev, rel);
 					
 					DBG_PRINTF("SIM %f   %f %f\n",sim, dev, devb);
 						
 					dev -= devb;
 					if(dev<0) dev = 0;
+						
+					rel -= relb;
+					if(rel<0) rel = 0;
 					
-					if(dev_min<0 || dev<dev_min || (dev_min==dev && sim>sim_best)) {
+					if(dev_min<0 || dev<dev_min || (dev_min==dev && std::abs(1-sim)<std::abs(1-sim_best))) {
 						dev_min = dev;
 						sim_best= sim;
+						rel_best= rel/trans[ait]->get_data().norm();
 						E = dev_min/trans[ait]->get_data().norm();
 						if(E!=E) E=0;
 					}
@@ -334,13 +341,13 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					}
 				}
 				#endif
-				(*it)->dist_trv_var() += dev_min;
+				(*it)->dist_trv_var() += rel_best;
 				
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/(typename TState::TEnergy)active_states.size());
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), std::sqrt((typename TState::TEnergy)(*it)->hops()));
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/(typename TState::TEnergy)active_states.size());
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/std::sqrt((typename TState::TEnergy)active_states.size()));
-				typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops());
+				typename TState::TEnergy R = std::pow(1-(1-(*it)->dist_trv_var())/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/std::sqrt((typename TState::TEnergy)active_states.size()));
 				if((*it)->dist_trv()<0) R=1;
 				//(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*(2*R-1) );
 				(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*R );
@@ -412,14 +419,15 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					to_be_added.push_back(opposite);
 					
 					typename TState::TEnergy off = 0;
-					if(!opposite->is_active()  || (*it)->dist_trv_var()<opposite->dist_trv_var() ||  1+(*it)->hops()>opposite->hops()) {
+					if(!opposite->is_active()  || (*it)->dist_trv_var()<opposite->dist_trv_var() ||  (*it)->hops()>opposite->hops())
+					{
 						//TODO: opposite->dist_trv() = std::min((typename TState::TEnergy)1, 1+(*it)->dist_trv());
 						
 						TArcIter_out best;
 						typename TState::TEnergy dev_min = -1, sim_best = 0;
 						for(TArcIter_out ait2((*it)->arc_out_begin(graph)); ait2!=(*it)->arc_out_end(graph); ++ait2) {
 							typename TState::TEnergy sim, dev, rel;
-							trans[ait2]->directed(*it).transition_factor2((*it)->travel(), ctxt.normalization_factor(), ctxt.distance_relation(), sim, dev, rel);							
+							trans[ait2]->directed(*it).transition_factor2((*it)->travel(), ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), sim, dev, rel);							
 							if(dev_min<0 || dev<dev_min || (dev_min==dev && sim>sim_best)) {
 								dev_min = dev;
 								sim_best= sim;
@@ -434,7 +442,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 						}
 						{
 							typename TState::TEnergy sim, rel;
-							trans[ait]->directed(opposite).transition_factor2(TLink( er ), ctxt.normalization_factor(), ctxt.distance_relation(), sim, off, rel);
+							trans[ait]->directed(opposite).transition_factor2(TLink( er ), ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), sim, off, rel);
 							opposite->reset_dist_trv(TLink( er ), 1-sim);
 							off = std::max(off, (typename TState::TEnergy)0.00001f);	//safety to prevent to become active state immediately
 						}
@@ -449,11 +457,10 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					opposite->dist_dev() = (*it)->dist_dev()+off;
 					opposite->hops() = std::max(opposite->hops(), 1+(*it)->hops());
 					
-					DBG_PRINTF("1 %d:%d setting dist %f/%f with %d hops (dir f)\n",
+					DBG_PRINTF("1 %d:%d setting dist %f/%f with %d hops (off %f)\n\n",
 						opposite->id(), (*it)->id(),
 						opposite->dist_trv(), opposite->dist_dev(),
-						opposite->hops()
-						//,trans[ait]->directed(opposite).transition_factor(odom, ctxt.param().prox_thr_)
+						opposite->hops(), off
 						);
 				}
 		}
