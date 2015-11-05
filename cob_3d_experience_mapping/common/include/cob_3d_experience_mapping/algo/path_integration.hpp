@@ -22,6 +22,11 @@ template<class TTransformation, class TGraph, class TMapTransformations, typenam
 void insert_transistion(TGraph &graph, TMapTransformations &trans, const TState &new_state, TTransformation &link) {
 	assert(link->src());
 	
+	if(new_state->id()<link->src()->id() && new_state->id()+10>link->src()->id()) {
+		DBG_PRINTF("not inserted\n");
+		return;
+	}
+	
 	DBG_PRINTF("insert with dev %f\n", link->deviation().norm());
 	trans.set(graph.addArc(new_state->node(), link->src()->node()), link);
 }
@@ -186,7 +191,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					insert_transistion(graph, trans, ctxt.current_active_state(), ctxt.virtual_transistion());
 					ctxt.id_generator().register_modification(ctxt.current_active_state());
 	
-					DBG_PRINTF("inserted new link");
+					DBG_PRINTF("inserted new link %d -> %d", ctxt.virtual_transistion()->src()->id(), ctxt.current_active_state()->id());
 				}
 			
 #ifndef NDEBUG
