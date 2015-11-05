@@ -114,6 +114,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 	typename TState::TEnergy dev_increment = ctxt.add_odom(odom.get_data(), odom_derv.get_data());
 	if(ctxt.virtual_state() && ctxt.virtual_transistion()) {		
 		ctxt.virtual_state()->set_dist_trv( ctxt.virtual_state()->dist_trv() - 1*dev_increment/ctxt.normalize(odom.get_data()).norm() - 0.9f*(1-ctxt.ft_current_slot_similiarity()) );
+		//dev_increment = ctxt.normalize(odom.get_data()).norm();
 		ctxt.virtual_state()->dist_dev() +=   dev_increment;
 		
 		DBG_PRINTF("%d changing dist V (%f/%f) by (%f, %f)\n", ctxt.virtual_state()->id(), ctxt.virtual_state()->dist_trv(), ctxt.virtual_state()->dist_dev(), dev_increment, (1-ctxt.ft_current_slot_similiarity()));
@@ -313,11 +314,8 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					
 					DBG_PRINTF("SIM %f   %f %f\n",sim, dev, devb);
 						
-					dev -= devb;
-					if(dev<0) dev = 0;
-						
-					rel -= relb;
-					if(rel<0) rel = 0;
+					dev = std::abs(dev-devb);
+					rel = std::abs(rel-relb);
 					
 					if(dev_min<0 || dev<dev_min || (dev_min==dev && std::abs(1-sim)<std::abs(1-sim_best))) {
 						dev_min = dev;
@@ -419,7 +417,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					to_be_added.push_back(opposite);
 					
 					typename TState::TEnergy off = 0;
-					if(!opposite->is_active()  || (*it)->dist_trv_var()<opposite->dist_trv_var() ||  (*it)->hops()>opposite->hops())
+					//if(!opposite->is_active()  || (*it)->dist_trv_var()<opposite->dist_trv_var() ||  (*it)->hops()>opposite->hops())
 					{
 						//TODO: opposite->dist_trv() = std::min((typename TState::TEnergy)1, 1+(*it)->dist_trv());
 						
@@ -443,10 +441,13 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 						{
 							typename TState::TEnergy sim, rel;
 							trans[ait]->directed(opposite).transition_factor2(TLink( er ), ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), sim, off, rel);
+							if(sim<=0) {
+								er.fill(0);
+								off=0;
+							}
 							opposite->reset_dist_trv(TLink( er ), 1-sim);
 							off = std::max(off, (typename TState::TEnergy)0.00001f);	//safety to prevent to become active state immediately
 						}
-						opposite->dist_trv_var() = (*it)->dist_trv_var();
 						
 						std::cout<<"dbg travel\n"<<(*it)->travel().get_data().transpose()<<"\n"<<trans[best]->directed(*it).get_data().transpose()<<"\n"<<opposite->travel().get_data().transpose()<<std::endl;
 					}
@@ -454,8 +455,12 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 						opposite->dist_trv_var() = (*it)->dist_trv_var();
 					}*/
 					//opposite->dist_trv()  = std::min((typename TState::TEnergy)1, std::max((typename TState::TEnergy)-1, trans[ait]->dist(ctxt.param().prox_thr_)+(*it)->dist_trv()));
-					opposite->dist_dev() = (*it)->dist_dev()+off;
-					opposite->hops() = std::max(opposite->hops(), 1+(*it)->hops());
+					
+					if(opposite->dist_dev() >= (*it)->dist_dev()+off || !opposite->is_active()) {
+						opposite->dist_trv_var() = (*it)->dist_trv_var();
+						opposite->dist_dev() = (*it)->dist_dev()+off;
+						opposite->hops() = std::max(opposite->hops(), 1+(*it)->hops());
+					}
 					
 					DBG_PRINTF("1 %d:%d setting dist %f/%f with %d hops (off %f)\n\n",
 						opposite->id(), (*it)->id(),
