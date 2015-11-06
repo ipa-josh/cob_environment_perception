@@ -325,8 +325,8 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					if(dev_min<0 || dev<dev_min || (dev_min==dev && std::abs(1-sim)<std::abs(1-sim_best))) {
 						dev_min = dev;
 						sim_best= sim;
-						rel_best= rel/trans[ait]->get_data().norm();
-						E = dev_min/trans[ait]->get_data().norm();
+						rel_best= rel/ctxt.normalize(trans[ait]->get_data()).norm();
+						E = dev_min/ctxt.normalize(trans[ait]->get_data()).norm();
 						if(E!=E) E=0;
 					}
 				}
