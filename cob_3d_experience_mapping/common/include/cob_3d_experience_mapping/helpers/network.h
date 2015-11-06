@@ -95,12 +95,18 @@ void sync_content_server_import(TContent &s, std::iostream &stream){
     
 	DBG_PRINTF("waiting for data\n");
 	
+	try {
+	
     /*if(s.get_network_header().compression_)
 		import_content_compr<TArchiveIn>(s, stream);
 	else*/
 		import_content<TArchiveIn>(s, stream);
 		
-	DBG_PRINTF("got data\n");
+		DBG_PRINTF("got data\n");
+	}
+	catch(...) {
+		ERROR_PRINTF("ERROR: deserialization failed");
+	}
 }
 	
 template<class TArchiveIn, class TArchiveOut, class TContent>
