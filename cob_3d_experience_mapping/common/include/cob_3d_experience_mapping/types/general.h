@@ -334,10 +334,12 @@ namespace cob_3d_experience_mapping {
 				}
 				if(found) continue;
 				
-				TPtr p_dst;
+				TPtr p_dst, p_src;
 				for(typename TGraph::NodeIt it(graph); it!=lemon::INVALID && !p_dst; ++it) {
 					if(states[it]->id_==trans_list[i].dst_)
 						p_dst = states[it];
+					if(states[it]->id_==id())
+						p_src = states[it];
 				}
 				
 				assert(p_dst);
@@ -345,7 +347,7 @@ namespace cob_3d_experience_mapping {
 				DBG_PRINTF("add arc %d %d\n", trans_list[i].src_, trans_list[i].dst_);
 				if(p_dst && p_dst->still_exists())
 					trans.set(graph.addArc(p_dst->node(), node()), typename TMapTransformations::Value(
-						new typename TMapTransformations::Value::element_type(trans_list[i].link_, p_dst)
+						new typename TMapTransformations::Value::element_type(trans_list[i].link_, p_src)
 					));
 			}
 		}
