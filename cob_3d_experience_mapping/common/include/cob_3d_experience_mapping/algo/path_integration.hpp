@@ -463,9 +463,13 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					//opposite->dist_trv()  = std::min((typename TState::TEnergy)1, std::max((typename TState::TEnergy)-1, trans[ait]->dist(ctxt.param().prox_thr_)+(*it)->dist_trv()));
 					
 					if(opposite->dist_dev() >= (*it)->dist_dev()+off || !opposite->is_active()) {
-						if(!opposite->is_active()) opposite->dist_trv_var() = (*it)->dist_trv_var();
+						if(!opposite->is_active()) {
+							opposite->dist_trv_var() = (*it)->dist_trv_var();
+							opposite->hops() = 1+(*it)->hops();
+						}
+						else
+							opposite->hops() = std::max(opposite->hops(), 1+(*it)->hops());
 						opposite->dist_dev() = (*it)->dist_dev()+off;
-						opposite->hops() = std::max(opposite->hops(), 1+(*it)->hops());
 					}
 					
 					DBG_PRINTF("1 %d:%d setting dist %f/%f with %d hops (off %f)\n\n",
