@@ -118,7 +118,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 
 	typename TState::TEnergy dev_increment = ctxt.add_odom(odom.get_data(), odom_derv.get_data());
 	if(ctxt.virtual_state() && ctxt.virtual_transistion()) {		
-		ctxt.virtual_state()->set_dist_trv( ctxt.virtual_state()->dist_trv() - 1*dev_increment/ctxt.normalize(odom.get_data()).norm() - 0.9f*(1-ctxt.ft_current_slot_similiarity()) );
+		ctxt.virtual_state()->set_dist_trv( ctxt.virtual_state()->dist_trv() - 0.5f*dev_increment/ctxt.normalize(odom.get_data()).norm() - 0.9f*(1-ctxt.ft_current_slot_similiarity()) );
 		//dev_increment = ctxt.normalize(odom.get_data()).norm();
 		ctxt.virtual_state()->dist_dev() +=   dev_increment;
 		

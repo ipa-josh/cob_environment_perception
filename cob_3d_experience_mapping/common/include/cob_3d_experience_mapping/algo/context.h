@@ -431,7 +431,7 @@ namespace cob_3d_experience_mapping {
 					if(active_states_[i]==virtual_state()) continue;
 					
 					//if(active_states_[i]->dist_trv()-active_states_[i]->dist_trv_var()<=-1 || active_states_[i]->dist_dev()-active_states_.front()->dist_dev() > 10*initial_distance()) {
-					if(active_states_[i]->dist_trv()<=std::max((TEnergy)-1, -active_states_[i]->dist_trv_var()) || active_states_[i]->dist_dev()-virtual_state()->dist_dev() > 10*initial_distance()) {
+					if(active_states_[i]->dist_trv()<=-0.5f || active_states_[i]->dist_dev()-virtual_state()->dist_dev() > 10*initial_distance()) {
 						active_states_[i]->is_active() = false;
 						active_states_.erase(active_states_.begin()+i);
 						--i;
