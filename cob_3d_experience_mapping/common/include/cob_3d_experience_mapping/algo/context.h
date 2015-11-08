@@ -142,7 +142,7 @@ namespace cob_3d_experience_mapping {
 						size_t first = i;
 						for(size_t k=i+1; k<ft_slots_.size(); k++)
 							if(ft_perceived_in(ft_slots_[i][j], ft_slots_[k])) first = k;
-						features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, sims[sims.size()-first-1], (sims[sims.size()-i]-sims[sims.size()-first-1])/2);
+						features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, sims[sims.size()-first-1], (1+sims[sims.size()-i]-sims[sims.size()-first-1])/2);
 						id_generator().register_modification(features_[ft_slots_[i][j]]);
 						if(!registered) id_generator().register_modification(current_active_state());
 						registered = true;
