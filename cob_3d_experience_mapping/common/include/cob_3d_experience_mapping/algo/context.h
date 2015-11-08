@@ -99,7 +99,8 @@ namespace cob_3d_experience_mapping {
 			return num/(TEnergy)(ft_slots_.size()-1);
 		}
 		
-		void ft_add_features() {
+		void ft_add_features(typename TTransform::TPtr trans) {
+			assert(current_active_state()==trans->dst());
 			
 			//boost::math::binomial_distribution<TEnergy> distribution(ft_slots_.size()-1,0.5);
 			DBG_PRINTF("debug ft slots:\n");
@@ -110,10 +111,24 @@ namespace cob_3d_experience_mapping {
 				DBG_PRINTF("\n");
 			}
 			
+			DBG_PRINTF("size %d %d\n", (int)action_seq_.size(), (int)ft_slots_.size());
+			assert(action_seq_.size() ==  ft_slots_.size());
+			
+			std::vector<TEnergy> sims;
+			sims.push_back(0);
+			for(size_t i=0; i<action_seq_.size()-1; i++) {
+				TEnergy sim, dev;
+				typename TTransform::TLink er;
+				virtual_transistion()->transition_factor(TTransform(-action_seq_[i], typename TTransform::TLink(), virtual_state()), normalization_factor(), sim, dev, er);
+				sims.push_back(sims.back()+sim);
+				DBG_PRINTF("sims %f\n", sims.back());
+			}
+			
 			std::map<typename TFeature::TID, bool> did_already;
 			TEnergy prob_max = 0;
 			bool registered = false;
 			typename TFeature::TID id_max = -1;
+			size_t i_max;
 			for(size_t i=1; i<ft_slots_.size(); i++) {
 				for(size_t j=0; j<ft_slots_[i].size(); j++) {
 					if(did_already.find(ft_slots_[i][j])!=did_already.end()) continue;
@@ -124,7 +139,10 @@ namespace cob_3d_experience_mapping {
 					DBG_PRINTF("ft prob %f\n", prob);
 					
 					if(prob>=0.5) {
-						features_[ft_slots_[i][j]]->visited(current_active_state().get(), current_active_state());
+						size_t first = i;
+						for(size_t k=i+1; k<ft_slots_.size(); k++)
+							if(ft_perceived_in(ft_slots_[i][j], ft_slots_[k])) first = k;
+						features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, sims[sims.size()-first-1], (sims[sims.size()-i]-sims[sims.size()-first-1])/2);
 						id_generator().register_modification(features_[ft_slots_[i][j]]);
 						if(!registered) id_generator().register_modification(current_active_state());
 						registered = true;
@@ -132,14 +150,18 @@ namespace cob_3d_experience_mapping {
 					if(prob>prob_max) {
 						prob_max = prob;
 						id_max = ft_slots_[i][j];
+						i_max = i;
 					}
 				}
 			}
 			
 			DBG_PRINTF("prob_max %f\n", prob_max);
 			
-			if(prob_max>0 && prob_max<=0.5) {
-				features_[id_max]->visited(current_active_state().get(), current_active_state());
+			if(prob_max>0 && prob_max<0.5) {
+				size_t first = i_max;
+				for(size_t k=i_max+1; k<ft_slots_.size(); k++)
+					if(ft_perceived_in(id_max, ft_slots_[k])) first = k;
+				features_[id_max]->visited(current_active_state().get(), trans, sims[sims.size()-first-1], (1+sims[sims.size()-i_max]-sims[sims.size()-first-1])/2);
 			
 				id_generator().register_modification(features_[id_max]);
 				if(!registered) id_generator().register_modification(current_active_state());
@@ -147,8 +169,8 @@ namespace cob_3d_experience_mapping {
 		}
 		
 		void ft_new_slot() {
-			if(ft_slots_.size()<1 || ft_slots_.front().size()>0)
-				ft_slots_.push_front(FeaturePerceivedSet());
+			//if(ft_slots_.size()<1 || ft_slots_.front().size()>0)
+			//	ft_slots_.push_front(FeaturePerceivedSet());
 				
 			/*DBG_PRINTF("ft_new_slot:\n");
 			for(size_t i=0; i<ft_slots_.size(); i++) {
@@ -288,6 +310,7 @@ namespace cob_3d_experience_mapping {
 			}
 			DBG_PRINTF("dev sum bef: %f\n", dev_sum_bef);
 			action_seq_.push_back(odom);
+			ft_slots_.push_front(FeaturePerceivedSet());
 			for(size_t i=0; virtual_transistion() && i<action_seq_.size(); i++) {
 				TEnergy sim, dev;
 				typename TTransform::TLink er;

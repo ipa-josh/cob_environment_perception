@@ -162,13 +162,17 @@ namespace cob_3d_experience_mapping {
 			return trv_;
 		}
 		
-		inline void merge_trv(const TEnergy &pos, const TEnergy &var) {
+		inline void merge_trv(const TEnergy &pos, const TEnergy &var, const TLink &link) {
 			const TEnergy t	= (var*var*dist_trv_ + dist_trv_var_*dist_trv_var_*pos) / (var*var+dist_trv_var_*dist_trv_var_);
 			
-			DBG_PRINTF("state %d: merge %f\n", id(), (1-t)/(1-dist_trv_));
-			assert(t>=dist_trv_);
+			DBG_PRINTF("state %d: merge %f    (%f/%f  %f/%f)\n", id(), (1-t)/(1-dist_trv_), pos, var, dist_trv_, dist_trv_var_);
+			//assert(t+0.000001f>=dist_trv_);
 			
-			if(dist_trv_!=1) trv_ 		   *= (1-t)/(1-dist_trv_);
+			//if(std::abs(dist_trv_-1)>0.000001f)
+			//	trv_       *= (1-t)/(1-dist_trv_);
+			trv_.set_link( (var*var*(1-dist_trv_)*trv_.get_data() + dist_trv_var_*dist_trv_var_*(1-pos)*link.get_data())
+						/ (var*var+dist_trv_var_*dist_trv_var_) );
+			
 			dist_trv_ 		= t;
 			dist_trv_var_ 	= std::sqrt(1/(1/(dist_trv_var_*dist_trv_var_) + 1/(var*var)));
 		}
@@ -327,7 +331,7 @@ namespace cob_3d_experience_mapping {
 				bool found = false;
 				for(TArcOutIterator ait(arc_out_begin(graph)); ait!=arc_out_end(graph); ++ait) {
 					if(trans_list[i].dst_ == states[opposite_node(graph, ait)]->id()) {
-						*trans[ait] = typename TMapTransformations::Value::element_type(trans_list[i].link_, trans[ait]->src());
+						*trans[ait] = typename TMapTransformations::Value::element_type(trans_list[i].link_, trans[ait]->dst());
 						found = true;
 						break;
 					}
@@ -363,16 +367,18 @@ namespace cob_3d_experience_mapping {
 	class Feature : public Object<TMeta> {
 	public:
 		typedef _TID TID;
+		typedef typename TInjection::TType TType;
 		typedef boost::shared_ptr<Feature> TPtr;
 		typedef void* StateHandle;
-		typedef typename TInjection::TFeatureClass TFeatureClass;
+		typedef typename TInjection::TState::TFeatureClass TFeatureClass;
 		
 		struct Connection {
 			typename TInjection::TPtr state_;
 			uint32_t counter_;
+			TType pos_, var_;
 			
-			Connection(typename TInjection::TPtr &s, uint32_t c):
-				state_(s), counter_(c)
+			Connection(typename TInjection::TPtr &s, uint32_t c, const TType &p, const TType &v):
+				state_(s), counter_(c), pos_(p), var_(v)
 			{}
 			
 			void merge(const Connection &o) {
@@ -411,47 +417,46 @@ namespace cob_3d_experience_mapping {
 		//!< setter for identifier
 		inline void set_id(const TID &id) {id_ = id;}
 		
-		bool visited(const StateHandle &h, typename TInjection::TPtr inj) {
+		bool visited(const StateHandle &h, typename TInjection::TPtr inj, const TType &pos, const TType &var) {
 			typename InjectionMap::iterator it = injections_.find(h);
 			if(it==injections_.end()) {
-				injections_.insert(typename InjectionMap::value_type(h, Connection(inj, 1)));
+				injections_.insert(typename InjectionMap::value_type(h, Connection(inj, 1, 1-pos, var)));
 				
 				//debug
 				char buf[32];
 				sprintf(buf,"ft%d ", id_);
-				inj->dbg().info_ += buf;
+				inj->dst()->dbg().info_ += buf;
 				
-				DBG_PRINTF("add feature %d -> %d\n", id_, inj->id());
+				DBG_PRINTF("add feature %d -> %d with (%f/%f)\n", id_, inj->dst()->id(), 1-pos, var);
 				
 				return true;
 			}
 			else {
 				it->second.counter_++;
-#ifdef DEBUG_
-				DBG_PRINTF("check ft (%d) cnt: %d <= %d for %d\n", id_, it->second.counter_, it->second.state_->get_feature_class_counter(0), it->second.state_->id());
-				assert(it->second.counter_<=it->second.state_->get_feature_class_counter(0));
-#endif
+
+				DBG_PRINTF("check ft (%d) cnt: %d <= %d for %d\n", id_, it->second.counter_, it->second.state_->dst()->get_feature_class_counter(0), it->second.state_->dst()->id());
+				assert(it->second.counter_<=it->second.state_->dst()->get_feature_class_counter(0));
 			}
 			
 			return false;
 		}
 		
 		template<typename TContext>
-		void inject(TContext *ctxt, const int ts, const int est_occ, const int max_occ, const TFeatureClass &ft_cl, const bool update, const typename TInjection::TEnergy prob=1) {
+		void inject(TContext *ctxt, const int ts, const int est_occ, const int max_occ, const TFeatureClass &ft_cl, const bool update, const TType prob=1) {
 			for(typename InjectionMap::iterator it=injections_.begin(); it!=injections_.end(); it++) {
 				//if state is already killed or still to be created --> skip injecting activation by external sensors
-				if(!it->second.state_->still_exists() || it->second.state_==ctxt->virtual_state()) continue;
+				if(!it->second.state_->dst()->still_exists() || it->second.state_->dst()==ctxt->virtual_state()) continue;
 			
 				//check if feature is in active list --> add if we not too ambiguous (50% of max. size of active state list)
 				if(2*injections_.size() < ctxt->param().max_active_states_)
-					ctxt->add_to_active(it->second.state_);
-				it->second.state_->merge_trv(1, 1);
+					ctxt->add_to_active(it->second.state_->dst());
+				it->second.state_->dst()->merge_trv(it->second.pos_, it->second.var_, *it->second.state_);
 				
 				if(update)
-					it->second.state_->update(ts, std::min(max_occ, (int)injections_.size()), est_occ, it->second.counter_, ft_cl, prob);
-				it->second.state_->seen() = true;
+					it->second.state_->dst()->update(ts, std::min(max_occ, (int)injections_.size()), est_occ, it->second.counter_, ft_cl, prob);
+				it->second.state_->dst()->seen() = true;
 				
-				DBG_PRINTF("injectXYZ %d -> %d with %d\n", id_, it->second.state_->id(), (int)(injections_.size()+est_occ));
+				DBG_PRINTF("injectXYZ %d -> %d with %d\n", id_, it->second.state_->dst()->id(), (int)(injections_.size()+est_occ));
 			}
 			DBG_PRINTF("inject %d\n", (int)injections_.size());
 		}
@@ -462,8 +467,9 @@ namespace cob_3d_experience_mapping {
 		 */
 		struct FeatureSerialization {
 			Feature ft_;
-		    std::vector<typename TInjection::ID> injs_;
+		    std::vector<typename TInjection::TState::ID> injs_;
 		    std::vector<uint32_t> cnts_;
+		    std::vector<TType> poss_, vars_;
 			
 			FeatureSerialization() : ft_(-1)
 			{}
@@ -478,6 +484,8 @@ namespace cob_3d_experience_mapping {
 				ar & UNIVERSAL_SERIALIZATION_NVP(ft_);
 				ar & UNIVERSAL_SERIALIZATION_NVP(injs_);
 				ar & UNIVERSAL_SERIALIZATION_NVP(cnts_);
+				ar & UNIVERSAL_SERIALIZATION_NVP(poss_);
+				ar & UNIVERSAL_SERIALIZATION_NVP(vars_);
 			}
 			
 			void merge(const FeatureSerialization &o) {
@@ -492,6 +500,8 @@ namespace cob_3d_experience_mapping {
 					if(!found) {
 						injs_.push_back(o.injs_[j]);
 						cnts_.push_back(o.cnts_[j]);
+						poss_.push_back(o.poss_[j]);
+						vars_.push_back(o.vars_[j]);
 					}
 				}
 			}
@@ -508,13 +518,15 @@ namespace cob_3d_experience_mapping {
 			FeatureSerialization fs(*this);
 			
 			for(typename InjectionMap::const_iterator it=injections_.begin(); it!=injections_.end(); it++) {
-				if(!it->second.state_->still_exists()) continue;
+				if(!it->second.state_->dst()->still_exists()) continue;
 				
-				fs.injs_.push_back(it->second.state_->id());
+				fs.injs_.push_back(it->second.state_->dst()->id());
 				fs.cnts_.push_back(it->second.counter_);
+				fs.poss_.push_back(it->second.pos_);
+				fs.vars_.push_back(it->second.var_);
 				
-				DBG_PRINTF("send ft (%d) cnt: %d <= %d for %d\n", id_, fs.cnts_.back(), it->second.state_->get_feature_class_counter(0), fs.injs_.back());
-				assert(fs.cnts_.back()<=it->second.state_->get_feature_class_counter(0));
+				DBG_PRINTF("send ft (%d) cnt: %d <= %d for %d\n", id_, fs.cnts_.back(), it->second.state_->dst()->get_feature_class_counter(0), fs.injs_.back());
+				assert(fs.cnts_.back()<=it->second.state_->dst()->get_feature_class_counter(0));
 			}
 			
 			return fs;
@@ -530,7 +542,7 @@ namespace cob_3d_experience_mapping {
 					if(states[it]->id()==fs.injs_[i]) {
 						DBG_PRINTF("check ft (%d) cnt: %d <= %d for %d\n", id_, fs.cnts_[i], states[it]->get_feature_class_counter(0), fs.injs_[i]);
 						assert(fs.cnts_[i]<=states[it]->get_feature_class_counter(0));
-						injections_.insert(typename InjectionMap::value_type(states[it].get(), Connection(states[it], fs.cnts_[i])));
+						injections_.insert(typename InjectionMap::value_type(states[it].get(), Connection(states[it], fs.cnts_[i], fs.poss_[i], fs.vars_[i])));
 						break;
 					}
 					

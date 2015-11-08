@@ -60,8 +60,8 @@ public:
 	typedef cob_3d_experience_mapping::TransformationLink<Scalar, NUM_TRANS, NUM_ROT> TTransformationLink;
 	typedef cob_3d_experience_mapping::State<cob_3d_experience_mapping::Empty /*meta data*/, Scalar, TGraph, TTransformationLink, TID, TFeatureClass
 	> State;
-	typedef cob_3d_experience_mapping::Feature<State, cob_3d_experience_mapping::Empty /*meta data*/, TID> Feature;
-	typedef cob_3d_experience_mapping::Transformation<TTransformationLink, typename State::TPtr> Transformation;
+	typedef cob_3d_experience_mapping::Transformation<TTransformationLink, State> Transformation;
+	typedef cob_3d_experience_mapping::Feature<Transformation, cob_3d_experience_mapping::Empty /*meta data*/, TID> Feature;
 #ifdef VIS_
 	typedef cob_3d_experience_mapping::visualization::VisualizationHandler<typename State::TGraph, typename TGraph::NodeMap<typename State::TPtr>, typename TGraph::ArcMap <typename Transformation::TPtr>, typename State::TPtr, typename State::TArcOutIterator> VisualizationHandler;
 #endif

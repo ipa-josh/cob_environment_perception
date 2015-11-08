@@ -52,6 +52,7 @@ namespace cob_3d_experience_mapping {
 		
 		
 		inline const TLink &get_data() const {return link_;}
+		inline void set_link(const TLink &l) {link_ = l;}
 		
 		inline TLink &deviation() {return deviation_;}
 		inline TLink deviation() const {return deviation_;}
@@ -180,8 +181,14 @@ namespace cob_3d_experience_mapping {
 				
 				DBG_PRINTF("error1 %f (allowed %f %f)   \t%f %f\n", dev, (dev1*tmp2.norm()/tmp1.norm())(0), (dev1*tmp2.norm()/tmp1.norm())(2), er(0), er(2));
 				
-				rel = er.sum();//(er-deviation_.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum();
+				rel = (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum();// er.sum();
 				//rel = std::min(rel, (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum());
+				
+				er = tmp2.cwiseAbs()-tmp1.cwiseAbs();
+				//for(int i=0; i<tmp1.rows(); i++)
+				//	if(tmp1(i)*tmp2(i)>0) er(i) = std::abs(er(i));
+				
+				//rel = er.cwiseMax(TLink::Zero()).sum();
 				
 				//er-= dev1*tmp2.norm()/tmp1.norm();
 				er-= dev1;//*tmp2.norm();
@@ -255,16 +262,18 @@ namespace cob_3d_experience_mapping {
 	};
 	
 	
-	template<class _TransformationLink, class TStatePtr>
+	template<class _TransformationLink, class _TState>
 	class Transformation : public _TransformationLink {
 	public:
 		typedef boost::shared_ptr<Transformation> TPtr;
+		typedef _TState TState;
 		typedef typename _TransformationLink::TLink TLink;
 		typedef typename _TransformationLink::TDist TDist;
 		typedef typename _TransformationLink::TType TType;
+		typedef typename TState::TPtr TStatePtr;
 		
 	protected:
-		TStatePtr src_;
+		TStatePtr src_, dst_;
 		
 		using typename _TransformationLink::link_;
 		
@@ -293,6 +302,9 @@ namespace cob_3d_experience_mapping {
 		
 		inline const TStatePtr &src() const {return src_;}
 		inline TStatePtr &src() {return src_;}
+		
+		inline const TStatePtr &dst() const {return dst_;}
+		inline TStatePtr &dst() {return dst_;}
 
 		Transformation directed(const TStatePtr &state) const {
 			if(state==src_) return *this;
