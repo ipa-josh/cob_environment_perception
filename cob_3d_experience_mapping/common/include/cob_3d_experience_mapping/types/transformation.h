@@ -168,6 +168,11 @@ namespace cob_3d_experience_mapping {
 			TLink tmp2 = o.link_.cwiseProduct(thr.cwiseInverse());
 			TLink dev1 = deviation_.cwiseProduct(thr.cwiseInverse()) + general_deviation.cwiseProduct(thr.cwiseInverse());
 			
+			TLink tmp2_t = tmp2;
+			for(int i=0; i<tmp1.rows(); i++)
+				if(tmp1(i)*tmp2(i)>0) tmp2(i)=0;
+				else tmp2_t(i)=0;
+			
 			if(tmp1.squaredNorm()) {
 				sim =  tmp1.dot( -tmp2 )/tmp1.squaredNorm();
 				dev = std::sqrt( std::max((TType)0, tmp2.squaredNorm() - sim*tmp1.dot( -tmp2 )) );
@@ -177,14 +182,14 @@ namespace cob_3d_experience_mapping {
 				//sim = std::min((TType)10, std::max((TType)0, sim));
 				//rel = sim*tmp1.norm()/tmp2.norm();
 				
-				TLink er = (tmp2+sim*tmp1).cwiseAbs();
+				TLink er = (tmp2+tmp2_t+sim*tmp1).cwiseAbs();
 				
 				DBG_PRINTF("error1 %f (allowed %f %f)   \t%f %f\n", dev, (dev1*tmp2.norm()/tmp1.norm())(0), (dev1*tmp2.norm()/tmp1.norm())(2), er(0), er(2));
 				
 				rel = (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum();// er.sum();
 				//rel = std::min(rel, (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum());
 				
-				er = tmp2.cwiseAbs()-tmp1.cwiseAbs();
+				//er = tmp2.cwiseAbs()-tmp1.cwiseAbs();
 				//for(int i=0; i<tmp1.rows(); i++)
 				//	if(tmp1(i)*tmp2(i)>0) er(i) = std::abs(er(i));
 				
