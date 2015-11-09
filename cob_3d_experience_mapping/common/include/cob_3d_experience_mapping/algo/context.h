@@ -15,12 +15,18 @@ namespace cob_3d_experience_mapping {
 	//! functions to sort active state list
 	namespace sorting {
 		
+		template<class T>
+		inline T mmax0(const T &v) {
+			return std::max<T>(0, v);
+		}
+		
 		//!< comparision of two states (by distance 1. deviation distance 2. travel distance)
 		template<class TStatePtr>
 		bool energy_order(const TStatePtr &a, const TStatePtr &b) {
 			if(a->dist_dev() == b->dist_dev())
 				return a->dist_trv() > b->dist_trv();
 			return a->dist_dev() < b->dist_dev();
+			//return a->dist_dev()+mmax0(a->dist_trv_var()-1) < b->dist_dev()+mmax0(b->dist_trv_var()-1);
 		}
 		
 		//!< function to check if list is sorted (fallback for older C++ versions)
@@ -142,7 +148,7 @@ namespace cob_3d_experience_mapping {
 						size_t first = i;
 						for(size_t k=i+1; k<ft_slots_.size(); k++)
 							if(ft_perceived_in(ft_slots_[i][j], ft_slots_[k])) first = k;
-						features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, sims[sims.size()-first-1], (1+sims[sims.size()-i]-sims[sims.size()-first-1])/2);
+						features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, (sims[sims.size()-first-1]+sims[sims.size()-i]-sims[sims.size()-first-1])/2, sims[sims.size()-i]-sims[sims.size()-first-1]);
 						id_generator().register_modification(features_[ft_slots_[i][j]]);
 						if(!registered) id_generator().register_modification(current_active_state());
 						registered = true;
@@ -161,7 +167,7 @@ namespace cob_3d_experience_mapping {
 				size_t first = i_max;
 				for(size_t k=i_max+1; k<ft_slots_.size(); k++)
 					if(ft_perceived_in(id_max, ft_slots_[k])) first = k;
-				features_[id_max]->visited(current_active_state().get(), trans, sims[sims.size()-first-1], (1+sims[sims.size()-i_max]-sims[sims.size()-first-1])/2);
+				features_[id_max]->visited(current_active_state().get(), trans, (sims[sims.size()-first-1]+sims[sims.size()-i_max]-sims[sims.size()-first-1])/2, sims[sims.size()-i_max]-sims[sims.size()-first-1]);
 			
 				id_generator().register_modification(features_[id_max]);
 				if(!registered) id_generator().register_modification(current_active_state());
@@ -454,7 +460,7 @@ namespace cob_3d_experience_mapping {
 					if(active_states_[i]==virtual_state()) continue;
 					
 					//if(active_states_[i]->dist_trv()-active_states_[i]->dist_trv_var()<=-1 || active_states_[i]->dist_dev()-active_states_.front()->dist_dev() > 10*initial_distance()) {
-					if(active_states_[i]->dist_trv()<=-0.5f || active_states_[i]->dist_dev()-virtual_state()->dist_dev() > 10*initial_distance()) {
+					if(active_states_[i]->dist_trv()<=-0.05f || active_states_[i]->dist_dev()-virtual_state()->dist_dev() > 10*initial_distance()) {
 						active_states_[i]->is_active() = false;
 						active_states_.erase(active_states_.begin()+i);
 						--i;
@@ -513,7 +519,7 @@ namespace cob_3d_experience_mapping {
 				modified = true;
 			}
 			//if( !(current_active_state() && virtual_state() && current_active_state()->id() < virtual_state()->id()-(param().min_age_+3) ) )
-			if( current_active_state() ) {
+			if( current_active_state() && ft_slots_.size()>0 ) {
 				if(current_active_state()==virtual_state()) {
 					if(!ft_perceived_in(id, ft_slots_.front()))
 						ft_slots_.front().push_back(id);

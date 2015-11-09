@@ -118,7 +118,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 
 	typename TState::TEnergy dev_increment = ctxt.add_odom(odom.get_data(), odom_derv.get_data());
 	if(ctxt.virtual_state() && ctxt.virtual_transistion()) {		
-		ctxt.virtual_state()->set_dist_trv( ctxt.virtual_state()->dist_trv() - dev_increment/ctxt.normalize(odom.get_data()).norm() - 0.9f*(1-ctxt.ft_current_slot_similiarity()) );
+		ctxt.virtual_state()->set_dist_trv( ctxt.virtual_state()->dist_trv() - dev_increment/ctxt.normalize(odom.get_data()).norm() - 0.45f*(1-ctxt.ft_current_slot_similiarity()) );
 		//dev_increment = ctxt.normalize(odom.get_data()).norm();
 		ctxt.virtual_state()->dist_dev() +=   dev_increment;
 		
@@ -334,11 +334,14 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					dev = std::abs(dev-devb);
 					rel = std::abs(rel-relb);
 					
+					if(simb<1 && sim>=1)
+						dev = 0;
+					
 					if(dev_min<0 || dev<dev_min || (dev_min==dev && std::abs(1-sim)<std::abs(1-sim_best))) {
 						dev_min = dev;
 						sim_best= sim;
 						rel_best= rel/ctxt.normalize(trans[ait]->get_data()).norm();
-						E = dev_min/ctxt.normalize(trans[ait]->get_data()).norm();
+						E = rel_best/ctxt.normalize(trans[ait]->get_data()).norm();
 						if(E!=E) E=0;
 					}
 				}
@@ -357,6 +360,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 				}
 				#endif
 				(*it)->dist_trv_var() += rel_best;
+				(*it)->dist_trv_var() = std::max((*it)->dist_trv_var(), 0.1f);
 				
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/(typename TState::TEnergy)active_states.size());
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), std::sqrt((typename TState::TEnergy)(*it)->hops()));
@@ -413,7 +417,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 	
 	//step 1: set min. dist.
 	for(TIter it=begin; it!=end; it++) {
-		if((*it)->dist_trv_var()>=1 || (/*!(*it)->seen()&&*/(*it)->dist_trv()>(*it)->dist_trv_var()) )
+		if((*it)->dist_trv_var()>=0.8f || (/*!(*it)->seen()&&*/(*it)->dist_trv()>(*it)->dist_trv_var()) )
 			continue;
 			
 		typename TState::TEnergy dh_max = 0;

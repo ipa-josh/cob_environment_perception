@@ -54,7 +54,7 @@ TEST(experience_mapping_lemon, straight)
 	boost::variate_generator<boost::mt19937&, boost::normal_distribution<float> > var_nor(rng, nd);
 	
 	int num_hops = 0;
-	for(int j=0; j<3; j++) {
+	for(int j=0; j<5; j++) {
 		for(int i=0; i<100; i++) {
 			const int aid = sn.ctxt_.current_active_state()->id();
 			bool found = false;
@@ -102,7 +102,7 @@ TEST(experience_mapping_lemon, random_walk)
 	boost::variate_generator<boost::mt19937&, boost::normal_distribution<float> > var_nor(rng, nd);
 	
 	int num_hops = 0;
-	for(int j=0; j<3; j++) {
+	for(int j=0; j<5; j++) {
 		srand(0);
 		for(int i=0; i<100; i++) {
 			const int aid = sn.ctxt_.current_active_state()->id();

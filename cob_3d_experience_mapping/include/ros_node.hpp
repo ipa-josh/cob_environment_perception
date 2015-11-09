@@ -45,7 +45,7 @@ public:
 };
 #endif
 
-template <typename Parent, int NUM_TRANS=2, int NUM_ROT=1, typename _Scalar=float>
+template <typename Parent, int NUM_TRANS=2, int NUM_ROT=2, typename _Scalar=float>
 class ROS_Node : public Parent
 {
 	FRIEND_TEST(experience_mapping_lemon, init);
@@ -230,7 +230,12 @@ public:
 		  if(link(2)>M_PI)  link(2) -= 2*M_PI;
 		  if(link(2)<-M_PI) link(2) += 2*M_PI;
 		  
-		  Transformation action_derv(link, Eigen::Vector3f::Zero(), ctxt_.current_active_state());
+		  if(link(2)<0) {
+			  link(3) = -link(2);
+			  link(2) = 0;
+		  }
+		  
+		  Transformation action_derv(link, Eigen::Vector4f::Zero(), ctxt_.current_active_state());
 		  
 		  if(!step_mode_) link *= (odom->header.stamp-time_last_odom_).toSec();
 		  
@@ -241,7 +246,7 @@ public:
 		  ROS_INFO("debug pose: %f %f %f", dbg_pose(0),dbg_pose(1),dbg_pose(2));
 		  ROS_INFO("odom: %f %f %f", link(0),link(1),link(2));
 
-		  Transformation action(link, Eigen::Vector3f::Zero(), ctxt_.current_active_state());
+		  Transformation action(link, Eigen::Vector4f::Zero(), ctxt_.current_active_state());
 		  if(step_mode_)
 			action.deviation() = ctxt_.param().default_deviation_factor_*link/action.dist();
 		  else

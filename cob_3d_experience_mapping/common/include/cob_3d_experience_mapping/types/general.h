@@ -170,7 +170,7 @@ namespace cob_3d_experience_mapping {
 			
 			//if(std::abs(dist_trv_-1)>0.000001f)
 			//	trv_       *= (1-t)/(1-dist_trv_);
-			trv_.set_link( (var*var*(1-dist_trv_)*trv_.get_data() + dist_trv_var_*dist_trv_var_*(1-pos)*link.get_data())
+			trv_.set_link( (var*var * trv_.get_data()  +  dist_trv_var_*dist_trv_var_ * (1-pos)*link.get_data())
 						/ (var*var+dist_trv_var_*dist_trv_var_) );
 			
 			dist_trv_ 		= t;
@@ -542,7 +542,7 @@ namespace cob_3d_experience_mapping {
 					if(states[it]->id()==fs.injs_[i]) {
 						DBG_PRINTF("check ft (%d) cnt: %d <= %d for %d\n", id_, fs.cnts_[i], states[it]->get_feature_class_counter(0), fs.injs_[i]);
 						assert(fs.cnts_[i]<=states[it]->get_feature_class_counter(0));
-						injections_.insert(typename InjectionMap::value_type(states[it].get(), Connection(states[it], fs.cnts_[i], fs.poss_[i], fs.vars_[i])));
+						//TODO: injections_.insert(typename InjectionMap::value_type(states[it].get(), Connection(states[it], fs.cnts_[i], fs.poss_[i], fs.vars_[i]) ));
 						break;
 					}
 					

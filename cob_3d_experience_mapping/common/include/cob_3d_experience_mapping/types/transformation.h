@@ -186,17 +186,23 @@ namespace cob_3d_experience_mapping {
 				
 				DBG_PRINTF("error1 %f (allowed %f %f)   \t%f %f\n", dev, (dev1*tmp2.norm()/tmp1.norm())(0), (dev1*tmp2.norm()/tmp1.norm())(2), er(0), er(2));
 				
-				rel = (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum();// er.sum();
+				//rel = er.sum();
+				//rel = (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum();// er.sum();
+				//rel = (er-deviation_.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum();
 				//rel = std::min(rel, (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum());
+				//rel = (er-dev1).cwiseMax(TLink::Zero()).sum();
 				
-				//er = tmp2.cwiseAbs()-tmp1.cwiseAbs();
+				rel = std::max((er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum(), (er-deviation_.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum());
+				
+				er = tmp2.cwiseAbs()+tmp2_t.cwiseAbs()-tmp1.cwiseAbs();
 				//for(int i=0; i<tmp1.rows(); i++)
 				//	if(tmp1(i)*tmp2(i)>0) er(i) = std::abs(er(i));
 				
 				//rel = er.cwiseMax(TLink::Zero()).sum();
 				
 				//er-= dev1*tmp2.norm()/tmp1.norm();
-				er-= dev1;//*tmp2.norm();
+				//er-= dev1;//*tmp2.norm();
+				//er -= general_deviation.cwiseProduct(thr.cwiseInverse());
 				
 				//er-= tmp2.cwiseAbs()*0.1f;
 				er = er.cwiseMax(TLink::Zero());
@@ -239,13 +245,13 @@ namespace cob_3d_experience_mapping {
 		
 		typename Eigen::Transform<TType,3,Eigen::Affine> affine() const {
 			BOOST_STATIC_ASSERT(NUM_TRANS<=3);
-			BOOST_STATIC_ASSERT(NUM_ROT==1);
+			BOOST_STATIC_ASSERT(NUM_ROT==2);
 			
 			Eigen::Matrix<TType, 3, 1> tr = Eigen::Matrix<TType, 3, 1>::Zero();
 			for(int i=0; i<NUM_TRANS; i++)
 				tr(i) = link_(i);
 			return Eigen::Translation<TType,3>(tr)
-					* Eigen::AngleAxis<TType>(link_.template tail<NUM_ROT>()(0), Eigen::Matrix<TType, 3, 1>::UnitZ());
+					* Eigen::AngleAxis<TType>(link_.template tail<NUM_ROT>()(0)-link_.template tail<NUM_ROT>()(1), Eigen::Matrix<TType, 3, 1>::UnitZ());
 		}
 		
 		UNIVERSAL_SERIALIZE()
