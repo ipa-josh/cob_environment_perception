@@ -159,7 +159,7 @@ namespace cob_3d_experience_mapping {
 			}
 			
 			DBG_PRINTF("tr f %f %f %f\t\t\t%f %f  \t\t   %f %f\n", sim, dev, rel, link_(0), link_(2), er(0), er(2));
-			DBG_PRINTF("links  %f %f\n", o.link_(0), o.link_(2));
+			DBG_PRINTF("links  %f %f %f\n", o.link_(0), o.link_(2), o.link_(3));
 			
 			//assert(er.norm() <= 2*o.link_.norm()+0.00001f);
 		}
@@ -168,10 +168,10 @@ namespace cob_3d_experience_mapping {
 			TLink tmp2 = o.link_.cwiseProduct(thr.cwiseInverse());
 			TLink dev1 = deviation_.cwiseProduct(thr.cwiseInverse()) + general_deviation.cwiseProduct(thr.cwiseInverse());
 			
-			TLink tmp2_t = tmp2;
+			/*TLink tmp2_t = tmp2;
 			for(int i=0; i<tmp1.rows(); i++)
 				if(tmp1(i)*tmp2(i)>0) tmp2(i)=0;
-				else tmp2_t(i)=0;
+				else tmp2_t(i)=0;*/
 			
 			if(tmp1.squaredNorm()) {
 				sim =  tmp1.dot( -tmp2 )/tmp1.squaredNorm();
@@ -182,7 +182,7 @@ namespace cob_3d_experience_mapping {
 				//sim = std::min((TType)10, std::max((TType)0, sim));
 				//rel = sim*tmp1.norm()/tmp2.norm();
 				
-				TLink er = (tmp2+tmp2_t+sim*tmp1).cwiseAbs();
+				TLink er = (tmp2+sim*tmp1).cwiseAbs();
 				
 				DBG_PRINTF("error1 %f (allowed %f %f)   \t%f %f\n", dev, (dev1*tmp2.norm()/tmp1.norm())(0), (dev1*tmp2.norm()/tmp1.norm())(2), er(0), er(2));
 				
@@ -194,7 +194,7 @@ namespace cob_3d_experience_mapping {
 				
 				rel = std::max((er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum(), (er-deviation_.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum());
 				
-				er = tmp2.cwiseAbs()+tmp2_t.cwiseAbs()-tmp1.cwiseAbs();
+				er = tmp2.cwiseAbs()-tmp1.cwiseAbs();
 				//for(int i=0; i<tmp1.rows(); i++)
 				//	if(tmp1(i)*tmp2(i)>0) er(i) = std::abs(er(i));
 				
@@ -228,11 +228,11 @@ namespace cob_3d_experience_mapping {
 			}
 			else
 				rel = dev = sim = 0;
-			DBG_PRINTF("dev %f %f\n", dev1(0), dev1(2));
-			DBG_PRINTF("link %f %f\n", tmp1(0), tmp1(2));
-			DBG_PRINTF("odom %f %f\n", tmp2(0), tmp2(2));
-			DBG_PRINTF("link %f %f %f\n", link_(0), link_(1), link_(2));
-			DBG_PRINTF("odom %f %f %f\n", o.link_(0), o.link_(1), o.link_(2));
+			DBG_PRINTF("dev %f %f %f\n", dev1(0), dev1(2), dev1(3));
+			DBG_PRINTF("link %f %f %f\n", tmp1(0), tmp1(2), tmp1(3));
+			DBG_PRINTF("odom %f %f %f\n", tmp2(0), tmp2(2), tmp2(3));
+			DBG_PRINTF("link %f %f %f %f\n", link_(0), link_(1), link_(2), link_(3));
+			DBG_PRINTF("odom %f %f %f %f\n", o.link_(0), o.link_(1), o.link_(2), o.link_(3));
 			DBG_PRINTF("tr f2 %f %f %f\t\t\t%f %f %f (f: %f)\n", sim, dev, rel, link_(0), link_(2), deviation().norm(), (relation_factor/dev1.norm()));
 		}
 		

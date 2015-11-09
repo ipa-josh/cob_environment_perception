@@ -110,7 +110,7 @@ namespace cob_3d_experience_mapping {
 			
 			//boost::math::binomial_distribution<TEnergy> distribution(ft_slots_.size()-1,0.5);
 			DBG_PRINTF("debug ft slots:\n");
-			for(size_t i=1; i<ft_slots_.size(); i++) {
+			for(size_t i=0; i<ft_slots_.size(); i++) {
 				DBG_PRINTF("ft slot %d (%f):  \t", (int)i, (float)(i-1)*2/((ft_slots_.size()-1)*ft_slots_.size()));//boost::math::pdf(distribution, i-1));
 				for(size_t j=0; j<ft_slots_[i].size(); j++)
 					DBG_PRINTF("%d\t", ft_slots_[i][j]);
@@ -139,7 +139,7 @@ namespace cob_3d_experience_mapping {
 				for(size_t j=0; j<ft_slots_[i].size(); j++) {
 					if(did_already.find(ft_slots_[i][j])!=did_already.end()) continue;
 					
-					const TEnergy prob = ft_chance_to_see(ft_slots_[i][j]) * (0.5f + (float)(i-1)/((ft_slots_.size()-1)*ft_slots_.size()));
+					const TEnergy prob = ft_chance_to_see(ft_slots_[i][j]);// * (0.5f + (float)(i-1)/((ft_slots_.size()-1)*ft_slots_.size()));
 					did_already[ft_slots_[i][j]] = true;
 				
 					DBG_PRINTF("ft prob %f\n", prob);
@@ -148,7 +148,8 @@ namespace cob_3d_experience_mapping {
 						size_t first = i;
 						for(size_t k=i+1; k<ft_slots_.size(); k++)
 							if(ft_perceived_in(ft_slots_[i][j], ft_slots_[k])) first = k;
-						features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, (sims[sims.size()-first-1]+sims[sims.size()-i]-sims[sims.size()-first-1])/2, sims[sims.size()-i]-sims[sims.size()-first-1]);
+						//features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, (sims[sims.size()-first-1]+sims[sims.size()-i]-sims[sims.size()-first-1])/2, sims[sims.size()-i]-sims[sims.size()-first-1]);
+						features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, sims[sims.size()-first-1], sims[sims.size()-i]-sims[sims.size()-first-1]);
 						id_generator().register_modification(features_[ft_slots_[i][j]]);
 						if(!registered) id_generator().register_modification(current_active_state());
 						registered = true;
@@ -167,7 +168,7 @@ namespace cob_3d_experience_mapping {
 				size_t first = i_max;
 				for(size_t k=i_max+1; k<ft_slots_.size(); k++)
 					if(ft_perceived_in(id_max, ft_slots_[k])) first = k;
-				features_[id_max]->visited(current_active_state().get(), trans, (sims[sims.size()-first-1]+sims[sims.size()-i_max]-sims[sims.size()-first-1])/2, sims[sims.size()-i_max]-sims[sims.size()-first-1]);
+				features_[id_max]->visited(current_active_state().get(), trans, sims[sims.size()-first-1], sims[sims.size()-i_max]-sims[sims.size()-first-1]);
 			
 				id_generator().register_modification(features_[id_max]);
 				if(!registered) id_generator().register_modification(current_active_state());

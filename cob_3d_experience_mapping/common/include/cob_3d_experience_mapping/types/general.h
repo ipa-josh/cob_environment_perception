@@ -162,19 +162,28 @@ namespace cob_3d_experience_mapping {
 			return trv_;
 		}
 		
-		inline void merge_trv(const TEnergy &pos, const TEnergy &var, const TLink &link) {
-			const TEnergy t	= (var*var*dist_trv_ + dist_trv_var_*dist_trv_var_*pos) / (var*var+dist_trv_var_*dist_trv_var_);
-			
-			DBG_PRINTF("state %d: merge %f    (%f/%f  %f/%f)\n", id(), (1-t)/(1-dist_trv_), pos, var, dist_trv_, dist_trv_var_);
-			//assert(t+0.000001f>=dist_trv_);
-			
-			//if(std::abs(dist_trv_-1)>0.000001f)
-			//	trv_       *= (1-t)/(1-dist_trv_);
-			trv_.set_link( (var*var * trv_.get_data()  +  dist_trv_var_*dist_trv_var_ * (1-pos)*link.get_data())
-						/ (var*var+dist_trv_var_*dist_trv_var_) );
-			
-			dist_trv_ 		= t;
-			dist_trv_var_ 	= std::sqrt(1/(1/(dist_trv_var_*dist_trv_var_) + 1/(var*var)));
+		inline void merge_trv(const bool overwrite, const TEnergy &pos, const TEnergy &var, const TLink &link) {
+			if(overwrite) {
+				DBG_PRINTF("state %d: merge OVERWRTIE    (%f/%f  %f/%f)\n", id(), pos, var, dist_trv_, dist_trv_var_);
+				
+				trv_.set_link( (1-pos)*link.get_data() );
+				dist_trv_ 		= pos;
+				dist_trv_var_ 	= var;
+			}
+			else {
+				const TEnergy t	= (var*var*dist_trv_ + dist_trv_var_*dist_trv_var_*pos) / (var*var+dist_trv_var_*dist_trv_var_);
+				
+				DBG_PRINTF("state %d: merge %f    (%f/%f  %f/%f)\n", id(), t, pos, var, dist_trv_, dist_trv_var_);
+				//assert(t+0.000001f>=dist_trv_);
+				
+				//if(std::abs(dist_trv_-1)>0.000001f)
+				//	trv_       *= (1-t)/(1-dist_trv_);
+				trv_.set_link( (var*var * trv_.get_data()  +  dist_trv_var_*dist_trv_var_ * (1-pos)*link.get_data())
+							/ (var*var+dist_trv_var_*dist_trv_var_) );
+				
+				dist_trv_ 		= t;
+				dist_trv_var_ 	= std::sqrt(1/(1/(dist_trv_var_*dist_trv_var_) + 1/(var*var)));
+			}
 		}
 		
 		//!< setter/getter for travel distance variance
@@ -264,7 +273,7 @@ namespace cob_3d_experience_mapping {
 			std::pair<I,bool> const& r=ft_class_occurences_.insert(typename TFeatureClassMap::value_type(ft_cl,1));
 			if (!r.second)
 				r.first->second++;
-			DBG_PRINTF("visited_featuer_class for %d: %d\n", id(), r.first->second);
+			DBG_PRINTF("visited_feature_class for %d: %d\n", id(), r.first->second);
 		}
 		
 		//!< getter for feature probability
@@ -448,9 +457,10 @@ namespace cob_3d_experience_mapping {
 				if(!it->second.state_->dst()->still_exists() || it->second.state_->dst()==ctxt->virtual_state()) continue;
 			
 				//check if feature is in active list --> add if we not too ambiguous (50% of max. size of active state list)
+				bool was_active = it->second.state_->dst()->is_active();
 				if(2*injections_.size() < ctxt->param().max_active_states_)
 					ctxt->add_to_active(it->second.state_->dst());
-				it->second.state_->dst()->merge_trv(it->second.pos_, it->second.var_, *it->second.state_);
+				it->second.state_->dst()->merge_trv(!was_active, it->second.pos_, it->second.var_, *it->second.state_);
 				
 				if(update)
 					it->second.state_->dst()->update(ts, std::min(max_occ, (int)injections_.size()), est_occ, it->second.counter_, ft_cl, prob);
