@@ -304,8 +304,8 @@ namespace cob_3d_experience_mapping {
 			this->deviation_ = dev;
 		}
 
-		Transformation(const _TransformationLink &o, const TStatePtr &state) :
-			src_(state)
+		Transformation(const _TransformationLink &o, const TStatePtr &state, const TStatePtr &dst) :
+			src_(state), dst_(dst)
 		{
 			this->link_ = o.get_data();
 			this->deviation_ = o.deviation();

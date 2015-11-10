@@ -382,6 +382,8 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		}
 	}
 	
+	ctxt.new_ft_slot();
+	
 #ifndef NDEBUG
 	{ //DEBUG
 		if(ctxt.virtual_state()->dbg().info_.find("V")==std::string::npos) ctxt.virtual_state()->dbg().info_ +="V ";

@@ -113,7 +113,7 @@ namespace cob_3d_experience_mapping {
 			for(size_t i=0; i<ft_slots_.size(); i++) {
 				DBG_PRINTF("ft slot %d (%f):  \t", (int)i, (float)(i-1)*2/((ft_slots_.size()-1)*ft_slots_.size()));//boost::math::pdf(distribution, i-1));
 				for(size_t j=0; j<ft_slots_[i].size(); j++)
-					DBG_PRINTF("%d\t", ft_slots_[i][j]);
+					DBG_PRINTF("%d\t", ft_slots_[i][j].id());
 				DBG_PRINTF("\n");
 			}
 			
@@ -137,6 +137,8 @@ namespace cob_3d_experience_mapping {
 			size_t i_max;
 			for(size_t i=1; i<ft_slots_.size(); i++) {
 				for(size_t j=0; j<ft_slots_[i].size(); j++) {
+					visited_feature_class(ft_slots_[i][j].class_id());
+					
 					if(did_already.find(ft_slots_[i][j])!=did_already.end()) continue;
 					
 					const TEnergy prob = ft_chance_to_see(ft_slots_[i][j]);// * (0.5f + (float)(i-1)/((ft_slots_.size()-1)*ft_slots_.size()));
@@ -149,7 +151,7 @@ namespace cob_3d_experience_mapping {
 						for(size_t k=i+1; k<ft_slots_.size(); k++)
 							if(ft_perceived_in(ft_slots_[i][j], ft_slots_[k])) first = k;
 						//features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, (sims[sims.size()-first-1]+sims[sims.size()-i]-sims[sims.size()-first-1])/2, sims[sims.size()-i]-sims[sims.size()-first-1]);
-						features_[ft_slots_[i][j]]->visited(current_active_state().get(), trans, sims[sims.size()-first-1], sims[sims.size()-i]-sims[sims.size()-first-1]);
+						features_[ft_slots_[i][j]]->visited(trans.get(), trans, sims[sims.size()-first-1], sims[sims.size()-i]-sims[sims.size()-first-1]);
 						id_generator().register_modification(features_[ft_slots_[i][j]]);
 						if(!registered) id_generator().register_modification(current_active_state());
 						registered = true;
@@ -187,6 +189,13 @@ namespace cob_3d_experience_mapping {
 			}*/
 		}
 		
+		void visited_feature_class(const typename TState::TFeatureClass &ft_class) {
+			if(current_active_state()) {
+				current_active_state()->visited_feature_class(ft_class);
+				id_generator().register_modification(current_active_state());
+			}
+		}
+		
 	private:
 		TActList active_states_;		//!< active state list
 		TParameter param_;			//!< parameter storage
@@ -211,12 +220,18 @@ namespace cob_3d_experience_mapping {
 			deviation_sum_.fill(0);
 			distance_distance_sum_ = distance_relation_sum_ = distance_relation_num_ = 0;
 			
+			ft_slots_.push_front(FeaturePerceivedSet());
+			
 			/*action_num_(0) = 20;
 			action_num_(2) = 20;
 			action_sum_(0) = 20*0.5;
 			action_sum_(2) = 20*0.4;
 			
 			distance_relation_ = 0.1f;*/
+		}
+		
+		void new_ft_slot() {
+			ft_slots_.push_front(FeaturePerceivedSet());
 		}
 		
 		inline TEnergy initial_distance() const {
@@ -317,7 +332,6 @@ namespace cob_3d_experience_mapping {
 			}
 			DBG_PRINTF("dev sum bef: %f\n", dev_sum_bef);
 			action_seq_.push_back(odom);
-			ft_slots_.push_front(FeaturePerceivedSet());
 			for(size_t i=0; virtual_transistion() && i<action_seq_.size(); i++) {
 				TEnergy sim, dev;
 				typename TTransform::TLink er;
@@ -401,7 +415,7 @@ namespace cob_3d_experience_mapping {
 					if(!already_set) {
 						//TODO: think about this correction
 						//if(state->dist_trv()<0)
-						//	state->dist_trv() = distance_relation()/2;
+						//err	state->dist_trv() = distance_relation()/2;
 						//state->dist_trv() = (1+state->dist_trv())/2;
 						state->dist_dev() 	= std::min(state->dist_dev(), virtual_state()->dist_dev()+initial_distance());
 						needs_sort_ = true;
@@ -490,13 +504,6 @@ namespace cob_3d_experience_mapping {
 		//!< settter/getter for mutex
 		boost::mutex &get_mutex() {return mtx_;}
 		
-		void visited_feature_class(const typename TState::TFeatureClass &ft_class) {
-			if(current_active_state()) {
-				current_active_state()->visited_feature_class(ft_class);
-				id_generator().register_modification(current_active_state());
-			}
-		}
-		
 		//!< if a feature was seen we connect the active state with the feature and update all connected states
 		void add_feature(const typename TFeature::TID &id, const int ts, const typename TState::TFeatureClass &ft_class) {
 			boost::lock_guard<boost::mutex> guard(mtx_);
@@ -507,7 +514,7 @@ namespace cob_3d_experience_mapping {
 			bool inject = true;
 			for(typename FeatureBuffer::iterator it = last_features_.begin(); it!=last_features_.end(); it++)
 				if(*it == id) {
-					DBG_PRINTF("feature %d already set\n", id);
+					DBG_PRINTF("feature %d already set\n", id.id());
 					inject = false;
 					break;
 				}
@@ -529,7 +536,8 @@ namespace cob_3d_experience_mapping {
 				//	modified |= it->second->visited(current_active_state().get(), current_active_state());
 			}
 			
-			it->second->inject(this, ts, param().est_occ_, param().max_active_states_, ft_class, inject);
+			if(it->second->inject(this, ts, param().est_occ_, param().max_active_states_, ft_class, inject))
+				needs_sort_ = true;
 			
 			if(modified)
 				id_generator().register_modification(it->second);
@@ -628,7 +636,7 @@ namespace cob_3d_experience_mapping {
 				//insert features
 				for(size_t i=0; i<fts.size(); i++) {
 					typename TContext::TFeature *tmp = new typename TContext::TFeature(fts[i].ft_.id());
-					tmp->set_serialization(fts[i], *graph_, *states_);
+					tmp->set_serialization(fts[i], *graph_, *states_, *trans_);
 					
 					ctxt_->get_features().insert(typename TContext::FeatureMap::value_type(fts[i].ft_.id(), typename TContext::TFeature::TPtr(tmp)) );
 				}
@@ -645,12 +653,13 @@ namespace cob_3d_experience_mapping {
 		typedef _TState TState;
 		typedef _TFeature TFeature;
 		typedef typename TState::ID ID;
+		typedef typename TFeature::TID FtID;
 		
 	private:
 		ID running_id_;
 		
 		std::map<ID, typename TState::TPtr>   modification_states_;
-		std::map<ID, typename TFeature::TPtr> modification_fts_;
+		std::map<FtID, typename TFeature::TPtr> modification_fts_;
 		
 	public:
 		ClientIdTsGenerator() : running_id_(1)
@@ -689,7 +698,7 @@ namespace cob_3d_experience_mapping {
 				DBG_PRINTF("upload state %d %d\n", it->second->id(), (int)it->second->still_exists() );
 			}
 			
-			for(typename std::map<ID, typename TFeature::TPtr>::iterator it = modification_fts_.begin(); it!=modification_fts_.end(); it++)
+			for(typename std::map<FtID, typename TFeature::TPtr>::iterator it = modification_fts_.begin(); it!=modification_fts_.end(); it++)
 				updated_fts.push_back( it->second );
 		}
 		
@@ -811,12 +820,15 @@ namespace cob_3d_experience_mapping {
 				net_header_.ts_fts_ = std::max(v_f[i].get_id(), net_header_.ts_fts_);
 				v_f[i].shared_ptr(); //prevent db update
 				
-				DBG_PRINTF("sending ft %d\n", copy_fts_.back().ft_.id());
+				DBG_PRINTF("sending ft %d\n", copy_fts_.back().ft_.id().id());
 				
-				for(size_t j=0; j<copy_fts_.back().injs_.size(); j++) {
-					assert(copy_fts_.back().injs_[j]<0);
-					DBG_PRINTF("sending injs %d -> %d\n", copy_fts_.back().injs_[j], convert2client_id(copy_fts_.back().injs_[j]));
-					copy_fts_.back().injs_[j] = convert2client_id(copy_fts_.back().injs_[j]);
+				for(size_t j=0; j<copy_fts_.back().dsts_.size(); j++) {
+					assert(copy_fts_.back().dsts_[j]<0);
+					assert(copy_fts_.back().srcs_[j]<0);
+					DBG_PRINTF("sending dsts_ %d -> %d\n", copy_fts_.back().dsts_[j], convert2client_id(copy_fts_.back().dsts_[j]));
+					DBG_PRINTF("sending srcs_ %d -> %d\n", copy_fts_.back().srcs_[j], convert2client_id(copy_fts_.back().srcs_[j]));
+					copy_fts_.back().dsts_[j] = convert2client_id(copy_fts_.back().dsts_[j]);
+					copy_fts_.back().srcs_[j] = convert2client_id(copy_fts_.back().srcs_[j]);
 				}
 			}
 			
@@ -968,10 +980,12 @@ namespace cob_3d_experience_mapping {
 			}
 			
 			for(size_t i=0; i<fts.size(); i++) {
-				DBG_PRINTF("new ftA %d\n", fts[i].ft_.id());
-				for(size_t j=0; j<fts[i].injs_.size(); j++) {
-					DBG_PRINTF("\tstateA %d / %d: %d\n", fts[i].injs_[j], convert2server_id(fts[i].injs_[j]), fts[i].cnts_[j]);
-					if(fts[i].injs_[j]>0) fts[i].injs_[j] = convert2server_id(fts[i].injs_[j]);
+				DBG_PRINTF("new ftA %d\n", fts[i].ft_.id().id());
+				for(size_t j=0; j<fts[i].dsts_.size(); j++) {
+					DBG_PRINTF("\tstateA %d / %d: %d\n", fts[i].dsts_[j], convert2server_id(fts[i].dsts_[j]), fts[i].dsts_[j]);
+					if(fts[i].dsts_[j]>0) fts[i].dsts_[j] = convert2server_id(fts[i].dsts_[j]);
+					DBG_PRINTF("\tstateA %d / %d: %d\n", fts[i].srcs_[j], convert2server_id(fts[i].srcs_[j]), fts[i].srcs_[j]);
+					if(fts[i].srcs_[j]>0) fts[i].srcs_[j] = convert2server_id(fts[i].srcs_[j]);
 				}
 			}
 			
@@ -983,7 +997,7 @@ namespace cob_3d_experience_mapping {
 				bool found = false;
 				for(size_t j=0; j<fts.size(); j++) {
 					if(v_f[i]->ft_.id()==fts[j].ft_.id()) {
-						DBG_PRINTF("removed old feature %d from db\n", v_f[i]->ft_.id());
+						DBG_PRINTF("removed old feature %d from db\n", v_f[i]->ft_.id().id());
 						v_f[i].destroy();	//remove old one
 						found = true;
 						
@@ -1005,10 +1019,12 @@ namespace cob_3d_experience_mapping {
 			}
 			
 			for(size_t i=0; i<fts.size(); i++) {
-				DBG_PRINTF("new ft %d\n", fts[i].ft_.id());
-				for(size_t j=0; j<fts[i].injs_.size(); j++) {
-					DBG_PRINTF("\tstate %d / %d: %d\n", fts[i].injs_[j], convert2server_id(fts[i].injs_[j]), fts[i].cnts_[j]);
-					if(fts[i].injs_[j]>0) fts[i].injs_[j] = convert2server_id(fts[i].injs_[j]);
+				DBG_PRINTF("new ft %d\n", fts[i].ft_.id().id());
+				for(size_t j=0; j<fts[i].dsts_.size(); j++) {
+					DBG_PRINTF("\tstate %d / %d: %d\n", fts[i].dsts_[j], convert2server_id(fts[i].dsts_[j]), fts[i].cnts_[j]);
+					if(fts[i].dsts_[j]>0) fts[i].dsts_[j] = convert2server_id(fts[i].dsts_[j]);
+					DBG_PRINTF("\tstate %d / %d: %d\n", fts[i].srcs_[j], convert2server_id(fts[i].srcs_[j]), fts[i].cnts_[j]);
+					if(fts[i].srcs_[j]>0) fts[i].srcs_[j] = convert2server_id(fts[i].srcs_[j]);
 				}
 				hiberlite::bean_ptr<typename TContext::TFeature::FeatureSerialization> p=server_->copyBean(fts[i]);
 				net_header_.ts_fts_ = std::max(p.get_id(), net_header_.ts_fts_);
@@ -1070,7 +1086,7 @@ namespace cob_3d_experience_mapping {
 			//insert features
 			for(size_t i=0; i<fts.size(); i++) {
 				typename TContext::TFeature *tmp = new typename TContext::TFeature(fts[i].ft_.id());
-				tmp->set_serialization(fts[i], *this->graph_, *this->states_);
+				tmp->set_serialization(fts[i], *this->graph_, *this->states_, *this->trans_);
 				
 				this->ctxt_->merge_feature(fts[i].ft_.id(), typename TContext::TFeature::TPtr(tmp));
 			}

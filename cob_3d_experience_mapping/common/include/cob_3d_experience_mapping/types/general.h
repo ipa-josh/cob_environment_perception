@@ -326,7 +326,7 @@ namespace cob_3d_experience_mapping {
 			
 			for(TArcOutIterator ait(arc_out_begin(graph)); ait!=arc_out_end(graph); ++ait) {
 				if(states[opposite_node(graph, ait)]->still_exists())
-					trans_list.push_back( TransitionSerialization(id(), states[opposite_node(graph, ait)]->id(), *trans[ait]) );
+					trans_list.push_back( TransitionSerialization(states[opposite_node(graph, ait)]->id(), id(), *trans[ait]) );
 			}
 		}
 		
@@ -340,7 +340,7 @@ namespace cob_3d_experience_mapping {
 				bool found = false;
 				for(TArcOutIterator ait(arc_out_begin(graph)); ait!=arc_out_end(graph); ++ait) {
 					if(trans_list[i].dst_ == states[opposite_node(graph, ait)]->id()) {
-						*trans[ait] = typename TMapTransformations::Value::element_type(trans_list[i].link_, trans[ait]->dst());
+						*trans[ait] = typename TMapTransformations::Value::element_type(trans_list[i].link_, trans[ait]->src(), trans[ait]->dst());
 						found = true;
 						break;
 					}
@@ -348,23 +348,58 @@ namespace cob_3d_experience_mapping {
 				if(found) continue;
 				
 				TPtr p_dst, p_src;
-				for(typename TGraph::NodeIt it(graph); it!=lemon::INVALID && !p_dst; ++it) {
+				for(typename TGraph::NodeIt it(graph); it!=lemon::INVALID && (!p_dst||!p_src); ++it) {
 					if(states[it]->id_==trans_list[i].dst_)
 						p_dst = states[it];
 					if(states[it]->id_==id())
 						p_src = states[it];
 				}
 				
+				DBG_PRINTF("add arc %d %d\n", trans_list[i].src_, trans_list[i].dst_);
+				
+				assert(p_src);
 				assert(p_dst);
 				
-				DBG_PRINTF("add arc %d %d\n", trans_list[i].src_, trans_list[i].dst_);
 				if(p_dst && p_dst->still_exists())
 					trans.set(graph.addArc(p_dst->node(), node()), typename TMapTransformations::Value(
-						new typename TMapTransformations::Value::element_type(trans_list[i].link_, p_src)
+						new typename TMapTransformations::Value::element_type(trans_list[i].link_, p_src, p_dst)
 					));
 			}
 		}
 		
+	};
+	
+	template<class _TFtID=int, class _TClID=int>
+	struct FeatureID {
+		typedef _TFtID TFtID;
+		typedef _TClID TClID;
+		
+		TFtID id_;
+		TClID class_;
+		
+		FeatureID(const TFtID &id) : id_(id), class_(-1) {}
+		FeatureID(const TFtID &id, const TClID &cl) : id_(id), class_(cl) {}
+		
+		inline const TFtID &id() const {return id_;}
+		inline const TClID &class_id() const {return class_;}
+		
+		inline bool operator<(const FeatureID &o) const {
+			if(class_==o.class_)
+				return id_<o.id_;
+			return class_<o.class_;
+		}
+		
+		inline bool operator==(const FeatureID &o) const {
+			return id_==o.id_ && class_==o.class_;
+		}
+			
+		UNIVERSAL_SERIALIZE()
+		{
+			assert(version==CURRENT_SERIALIZATION_VERSION);
+			
+			ar & UNIVERSAL_SERIALIZATION_NVP(id_);
+			ar & UNIVERSAL_SERIALIZATION_NVP(class_);
+		}
 	};
 	
 
@@ -391,6 +426,7 @@ namespace cob_3d_experience_mapping {
 			{}
 			
 			void merge(const Connection &o) {
+				DBG_PRINTF("merge %d %d\n", state_->dst()->id(), o.state_->dst()->id());
 				assert(state_ == o.state_);
 				
 				counter_ = o.counter_;	//TODO: this could remove already incremented counter between updates
@@ -404,15 +440,15 @@ namespace cob_3d_experience_mapping {
 		InjectionMap injections_;
 		
 	public:
-		Feature(const TID id) : id_(id)
+		Feature(const TID &id) : id_(id)
 		{}
 		
-		inline TID id() const {return id_;}
+		inline const TID &id() const {return id_;}
 		
 		void merge(const TPtr &o) {
 			assert(id()==o->id());
 			
-			DBG_PRINTF("merge feature %d\n", id());
+			DBG_PRINTF("merge feature %d\n", id().id());
 			
 			for(typename InjectionMap::iterator it=o->injections_.begin(); it!=o->injections_.end(); it++) {
 				typename InjectionMap::iterator itt = injections_.find(it->first);
@@ -433,17 +469,17 @@ namespace cob_3d_experience_mapping {
 				
 				//debug
 				char buf[32];
-				sprintf(buf,"ft%d ", id_);
+				sprintf(buf,"ft%d ", id_.id());
 				inj->dst()->dbg().info_ += buf;
 				
-				DBG_PRINTF("add feature %d -> %d with (%f/%f)\n", id_, inj->dst()->id(), 1-pos, var);
+				DBG_PRINTF("add feature %d -> %d with (%f/%f)\n", id_.id(), inj->dst()->id(), 1-pos, var);
 				
 				return true;
 			}
 			else {
 				it->second.counter_++;
 
-				DBG_PRINTF("check ft (%d) cnt: %d <= %d for %d\n", id_, it->second.counter_, it->second.state_->dst()->get_feature_class_counter(0), it->second.state_->dst()->id());
+				DBG_PRINTF("check ft (%d) cnt: %d <= %d for %d\n", id_.id(), it->second.counter_, it->second.state_->dst()->get_feature_class_counter(0), it->second.state_->dst()->id());
 				assert(it->second.counter_<=it->second.state_->dst()->get_feature_class_counter(0));
 			}
 			
@@ -451,7 +487,8 @@ namespace cob_3d_experience_mapping {
 		}
 		
 		template<typename TContext>
-		void inject(TContext *ctxt, const int ts, const int est_occ, const int max_occ, const TFeatureClass &ft_cl, const bool update, const TType prob=1) {
+		bool inject(TContext *ctxt, const int ts, const int est_occ, const int max_occ, const TFeatureClass &ft_cl, const bool update, const TType prob=1) {
+			bool changed = false;
 			for(typename InjectionMap::iterator it=injections_.begin(); it!=injections_.end(); it++) {
 				//if state is already killed or still to be created --> skip injecting activation by external sensors
 				if(!it->second.state_->dst()->still_exists() || it->second.state_->dst()==ctxt->virtual_state()) continue;
@@ -461,14 +498,17 @@ namespace cob_3d_experience_mapping {
 				if(2*injections_.size() < ctxt->param().max_active_states_)
 					ctxt->add_to_active(it->second.state_->dst());
 				it->second.state_->dst()->merge_trv(!was_active, it->second.pos_, it->second.var_, *it->second.state_);
+				changed = true;
 				
 				if(update)
 					it->second.state_->dst()->update(ts, std::min(max_occ, (int)injections_.size()), est_occ, it->second.counter_, ft_cl, prob);
 				it->second.state_->dst()->seen() = true;
 				
-				DBG_PRINTF("injectXYZ %d -> %d with %d\n", id_, it->second.state_->dst()->id(), (int)(injections_.size()+est_occ));
+				DBG_PRINTF("injectXYZ %d -> %d with %d\n", id_.id(), it->second.state_->dst()->id(), (int)(injections_.size()+est_occ));
 			}
 			DBG_PRINTF("inject %d\n", (int)injections_.size());
+			
+			return changed;
 		}
 		
 		/**
@@ -477,7 +517,7 @@ namespace cob_3d_experience_mapping {
 		 */
 		struct FeatureSerialization {
 			Feature ft_;
-		    std::vector<typename TInjection::TState::ID> injs_;
+		    std::vector<typename TInjection::TState::ID> dsts_, srcs_;
 		    std::vector<uint32_t> cnts_;
 		    std::vector<TType> poss_, vars_;
 			
@@ -492,23 +532,25 @@ namespace cob_3d_experience_mapping {
 				assert(version==CURRENT_SERIALIZATION_VERSION);
 				
 				ar & UNIVERSAL_SERIALIZATION_NVP(ft_);
-				ar & UNIVERSAL_SERIALIZATION_NVP(injs_);
+				ar & UNIVERSAL_SERIALIZATION_NVP(dsts_);
+				ar & UNIVERSAL_SERIALIZATION_NVP(srcs_);
 				ar & UNIVERSAL_SERIALIZATION_NVP(cnts_);
 				ar & UNIVERSAL_SERIALIZATION_NVP(poss_);
 				ar & UNIVERSAL_SERIALIZATION_NVP(vars_);
 			}
 			
 			void merge(const FeatureSerialization &o) {
-				for(size_t j=0; j<o.injs_.size(); j++) {
+				for(size_t j=0; j<o.dsts_.size(); j++) {
 					bool found=false;
-					for(size_t i=0; i<injs_.size(); i++) {
-						if(injs_[i]!=o.injs_[j]) continue;
+					for(size_t i=0; i<dsts_.size(); i++) {
+						if(dsts_[i]!=o.dsts_[j]) continue;
 						cnts_[i] = std::max(cnts_[i], o.cnts_[j]);
 						found = true;
 						break;
 					}
 					if(!found) {
-						injs_.push_back(o.injs_[j]);
+						dsts_.push_back(o.dsts_[j]);
+						srcs_.push_back(o.srcs_[j]);
 						cnts_.push_back(o.cnts_[j]);
 						poss_.push_back(o.poss_[j]);
 						vars_.push_back(o.vars_[j]);
@@ -521,38 +563,61 @@ namespace cob_3d_experience_mapping {
 		{
 		    assert(version==CURRENT_SERIALIZATION_VERSION);
 		    
-		    ar & UNIVERSAL_SERIALIZATION_NVP_NAMED("id", id_);
+		    ar & UNIVERSAL_SERIALIZATION_NVP(id_);
 		}
 		
 		FeatureSerialization get_serialization() const {
 			FeatureSerialization fs(*this);
 			
 			for(typename InjectionMap::const_iterator it=injections_.begin(); it!=injections_.end(); it++) {
-				if(!it->second.state_->dst()->still_exists()) continue;
+				assert(it->second.state_);
+				assert(it->second.state_->dst());
+				assert(it->second.state_->src());
 				
-				fs.injs_.push_back(it->second.state_->dst()->id());
+				if(!it->second.state_->dst()->still_exists() || !it->second.state_->src()->still_exists()) continue;
+				
+				fs.dsts_.push_back(it->second.state_->dst()->id());
+				fs.srcs_.push_back(it->second.state_->src()->id());
 				fs.cnts_.push_back(it->second.counter_);
 				fs.poss_.push_back(it->second.pos_);
 				fs.vars_.push_back(it->second.var_);
 				
-				DBG_PRINTF("send ft (%d) cnt: %d <= %d for %d\n", id_, fs.cnts_.back(), it->second.state_->dst()->get_feature_class_counter(0), fs.injs_.back());
+				DBG_PRINTF("send ft (%d) cnt: %d <= %d for %d/%d\n", id_.id(), fs.cnts_.back(), it->second.state_->dst()->get_feature_class_counter(0), fs.dsts_.back(), fs.srcs_.back());
 				assert(fs.cnts_.back()<=it->second.state_->dst()->get_feature_class_counter(0));
 			}
 			
 			return fs;
 		}
 		
-		template<class TGraph, class TMapStates>
-		void set_serialization(const FeatureSerialization &fs, TGraph &graph, TMapStates &states) {
+		template<class TGraph, class TMapStates, class TMapTransformations>
+		void set_serialization(const FeatureSerialization &fs, TGraph &graph, TMapStates &states, TMapTransformations &trans) {
+			typedef typename TInjection::TState TState;
+			typedef typename TState::TArcOutIterator TArcIter_out;
+	
 			id_ = fs.ft_.id();
 			
 			//reconnect features with states
-			for(size_t i=0; i<fs.injs_.size(); i++) {
+			assert(fs.dsts_.size()==fs.srcs_.size());
+			for(size_t i=0; i<fs.dsts_.size(); i++) {
 				for(typename TGraph::NodeIt it(graph); it!=lemon::INVALID; ++it)
-					if(states[it]->id()==fs.injs_[i]) {
-						DBG_PRINTF("check ft (%d) cnt: %d <= %d for %d\n", id_, fs.cnts_[i], states[it]->get_feature_class_counter(0), fs.injs_[i]);
+					if(states[it]->id()==fs.dsts_[i]) {
+						states[it]->visited_feature_class(id_.class_id());
+						
+						DBG_PRINTF("check ft (%d) cnt: %d <= %d for %d/%d\n", id_.id(), fs.cnts_[i], states[it]->get_feature_class_counter(0), fs.dsts_[i], fs.srcs_[i]);
 						assert(fs.cnts_[i]<=states[it]->get_feature_class_counter(0));
-						//TODO: injections_.insert(typename InjectionMap::value_type(states[it].get(), Connection(states[it], fs.cnts_[i], fs.poss_[i], fs.vars_[i]) ));
+						
+						bool exist=false;
+						for(TArcIter_out ait(states[it]->arc_out_begin(graph)); ait!=states[it]->arc_out_end(graph); ++ait) {
+							typename TState::TPtr opposite = states[states[it]->opposite_node(graph, ait)];
+							//DBG_PRINTF("op id %d\n", opposite->id());
+							if(opposite->id()==fs.srcs_[i]) {
+								exist=true;
+								injections_.insert(typename InjectionMap::value_type(trans[ait].get(), Connection(trans[ait], fs.cnts_[i], fs.poss_[i], fs.vars_[i]) ));
+								break;
+							}
+						}
+						
+						assert(exist);				
 						break;
 					}
 					

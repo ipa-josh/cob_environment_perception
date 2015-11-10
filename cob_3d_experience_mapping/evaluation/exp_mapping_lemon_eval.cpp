@@ -22,11 +22,12 @@
 typedef float Scalar;
 typedef int TID;
 typedef int TFeatureClass;
+typedef cob_3d_experience_mapping::FeatureID<TID,TFeatureClass> TFeatureId;
 typedef lemon::ListDigraph TGraph;
 typedef cob_3d_experience_mapping::TransformationLink<Scalar, NUM_TRANS, NUM_ROT> TTransformationLink;
 typedef cob_3d_experience_mapping::State<cob_3d_experience_mapping::Empty, Scalar, TGraph, TTransformationLink, TID, TFeatureClass> State;
 typedef cob_3d_experience_mapping::Transformation<TTransformationLink, State> Transformation;
-typedef cob_3d_experience_mapping::Feature<Transformation, cob_3d_experience_mapping::Empty, TID> Feature;
+typedef cob_3d_experience_mapping::Feature<Transformation, cob_3d_experience_mapping::Empty, TFeatureId> Feature;
 typedef cob_3d_experience_mapping::Context<Scalar /*energy*/, State /*state*/, Feature, Eigen::Matrix<float,1,2>/*energy weight*/, Transformation/*tranformation*/> TContext;
 typedef TGraph::NodeMap<typename State::TPtr> TMapStates;
 typedef TGraph::ArcMap <typename Transformation::TPtr> TMapTransformations;
@@ -126,8 +127,7 @@ int main(int argc, char **argv) {
 			++ts;
 	  
 			//cob_3d_experience_mapping::algorithms::reset_features(ctxt_.active_states());
-			ctxt_.visited_feature_class(0);
-			ctxt_.add_feature(vid->current_id, ts, 0);
+			ctxt_.add_feature(TFeatureId(vid->current_id,0), ts, 0);
 		}
 		
 		//odom
@@ -159,8 +159,7 @@ int main(int argc, char **argv) {
 			  
 			  ++ts;
 			  //cob_3d_experience_mapping::algorithms::reset_features(ctxt_.active_states());
-			  ctxt_.visited_feature_class(0);
-			  ctxt_.add_feature(it->second, ts, 0);
+			  ctxt_.add_feature(TFeatureId(it->second,0), ts, 0);
 		  }
 		  
 		  if(odom->header.stamp-time_last_odom_<ros::Duration(100)) {
