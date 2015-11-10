@@ -37,7 +37,8 @@ int main(int argc, char **argv) {
       acceptor.accept(*stream.rdbuf(), ec);
       if (!ec)
       {
-		  container.on_client(stream, running_client_id_);
+		  cob_3d_experience_mapping::serialization::IOPackedStream ios(stream);
+		  container.on_client(ios, running_client_id_);
       }
     }
 	

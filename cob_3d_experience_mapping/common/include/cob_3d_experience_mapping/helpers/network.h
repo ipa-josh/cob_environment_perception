@@ -43,24 +43,28 @@ namespace serialization {
 template<class TArchiveIn, class TArchiveOut, class TContent>
 void sync_content_client(TContent &s, const char * addr, const char * port, const int timeout_secs=120){
     // make an archive
-    boost::asio::ip::tcp::iostream stream;
+    boost::asio::ip::tcp::iostream net_stream;
     
     //set timeout
-    stream.expires_from_now(boost::posix_time::seconds(timeout_secs));
+    net_stream.expires_from_now(boost::posix_time::seconds(timeout_secs));
     
     //connect to server and upload our data
-    stream.connect(addr, port);
+    net_stream.connect(addr, port);
     
-    assert(stream.good());
+    assert(net_stream.good());
+    
+    IOPackedStream stream(net_stream);
     
     //send request header without compression
     typename TContent::TNetworkHeader request_header = s.get_network_header();
 	export_content<TArchiveOut>(request_header, stream);
+	stream.finish();
 		
     /*if(request_header.compression_)
 		export_content_compr<TArchiveOut>(s, stream);	
     else*/
 		export_content<TArchiveOut>(s, stream);
+	stream.finish();
 		
 	DBG_PRINTF("sent data\n");
 		
@@ -112,10 +116,12 @@ void sync_content_server_import(TContent &s, std::iostream &stream){
 template<class TArchiveIn, class TArchiveOut, class TContent>
 void sync_content_server_export(TContent &s, std::iostream &stream){    
     assert(stream.good());
+	IOPackedStream *packed_stream = dynamic_cast<IOPackedStream*>(&stream);
     
     //send request header without compression
     typename TContent::TNetworkHeader request_header = s.get_network_header();
 	export_content<TArchiveOut>(request_header, stream);
+	if(packed_stream) packed_stream->finish();
 	
 	DBG_PRINTF("sent header\n");
 		
@@ -123,6 +129,7 @@ void sync_content_server_export(TContent &s, std::iostream &stream){
 		export_content_compr<TArchiveOut>(s, stream);	
     else*/
 		export_content<TArchiveOut>(s, stream);
+	if(packed_stream) packed_stream->finish();
 		
 	DBG_PRINTF("sent data\n");
 }
