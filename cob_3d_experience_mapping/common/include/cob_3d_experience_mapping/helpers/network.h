@@ -7,6 +7,84 @@
 namespace cob_3d_experience_mapping{
 //! interfaces and implementations needed to serialize map with boost
 namespace serialization {
+
+class PackedStream: public std::streambuf
+{
+    std::iostream &ios_;
+    uint32_t pos_, size_;
+    std::vector<char> buffer_;
+    
+    void new_frame() {
+		buffer_.resize(4);
+		pos_ = 0;
+	}
+	
+	inline uint32_t get_size() const {
+		return size_;
+	} 
+    
+public:
+    PackedStream(std::iostream &ios) :
+        ios_(ios), pos_(4), size_(0)
+    {
+		new_frame();
+    }
+
+    virtual ~PackedStream()
+    {
+        sync();
+    }
+
+    virtual std::streambuf::int_type underflow()
+    {
+		DBG_PRINTF("underflow1\n");
+		while(pos_<4)
+			((char*)&size_)[pos_++] = ios_.get();
+		DBG_PRINTF("underflow2 %d %d\n", pos_, get_size());
+		if(pos_>=get_size()) {
+			size_ = pos_ = 0;
+			return traits_type::eof();
+		}
+		++pos_;
+        return traits_type::to_int_type(ios_.get());
+    }
+
+    virtual std::streambuf::int_type overflow(std::streambuf::int_type value)
+    {
+		buffer_.push_back(value);
+        return traits_type::not_eof(value);
+    };
+
+    virtual int sync()
+    {
+		ios_.flush();
+		return ios_.sync();
+    }
+    
+    void finish() {
+		*((uint32_t*)&buffer_[0]) = (uint32_t)buffer_.size();
+		ios_.write(&buffer_[0], buffer_.size());
+		ios_.flush();
+		new_frame();
+	}
+};
+
+class IOPackedStream: public std::iostream
+{
+public:
+    IOPackedStream(std::iostream &stream) :
+        std::iostream(new PackedStream(stream)) {}
+
+    virtual ~IOPackedStream()
+    {
+        delete rdbuf();
+    }
+    
+    void finish() {
+		((PackedStream*)rdbuf())->finish();
+	}
+};
+
 	
 	template<class _TClientId, class _TID>
 	struct NetworkHeader {
