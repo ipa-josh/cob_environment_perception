@@ -5,6 +5,9 @@
 #include "types/general.h"
 #include "types/transformation.h"
 #include "algo/context.h"
+#ifdef CLOUD_
+#include "algo/context_cloud.h"
+#endif
 #include <limits>
 
 //! interfaces and implementations of cob_3d_experience_mapping
