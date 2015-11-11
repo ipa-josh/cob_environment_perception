@@ -348,7 +348,7 @@ namespace cob_3d_experience_mapping {
 				if(found) continue;
 				
 				TPtr p_dst, p_src;
-				for(typename TGraph::NodeIt it(graph); it!=lemon::INVALID && (!p_dst||!p_src); ++it) {
+				for(typename TGraph::NodeIt it(graph); it!=lemon::INVALID && !(p_dst&&p_src); ++it) {
 					if(states[it]->id_==trans_list[i].dst_)
 						p_dst = states[it];
 					if(states[it]->id_==id())
@@ -358,7 +358,7 @@ namespace cob_3d_experience_mapping {
 				DBG_PRINTF("add arc %d %d\n", trans_list[i].src_, trans_list[i].dst_);
 				
 				assert(p_src);
-				assert(p_dst);
+				//assert(p_dst); //could be a virtual state which was resetted
 				
 				if(p_dst && p_dst->still_exists())
 					trans.set(graph.addArc(p_dst->node(), node()), typename TMapTransformations::Value(
@@ -617,7 +617,11 @@ namespace cob_3d_experience_mapping {
 							}
 						}
 						
+#ifdef CLOUD_
+						if(!exist) ERROR_PRINTF("Error: should exist!!!!\n");
+#else
 						assert(exist);				
+#endif
 						break;
 					}
 					

@@ -317,7 +317,7 @@ namespace cob_3d_experience_mapping {
 				updated_states[j]->set_id( convert2client_id(updated_states[j]->id()) );
 			
 			server_->begin_transaction();
-			for(size_t j=0; j<updated_states.size(); j++) {
+			/*for(size_t j=0; j<updated_states.size(); j++) {
 				if(updated_states[j]->id()>=0) continue;
 				DBG_PRINTF("checking %d to remove from db\n", updated_states[j]->id());
 				hiberlite::bean_ptr<TState> p = server_->loadBean<TState>(-updated_states[j]->id());
@@ -331,11 +331,19 @@ namespace cob_3d_experience_mapping {
 				p.destroy();	//remove old one
 				DBG_PRINTF("destroyed\n");
 			}
-			DBG_PRINTF("done\n");
+			DBG_PRINTF("done\n");*/
 			
 			//save to db	
 			for(size_t i=0; i<updated_states.size(); i++) {
-				hiberlite::bean_ptr<TState> p=server_->copyBean(*updated_states[i]);
+				hiberlite::bean_ptr<TState> p;
+				if(updated_states[i]->id()>=0)
+					p=server_->copyBean(*updated_states[i]);
+				else {
+					DBG_PRINTF("loading state %d from db\n", updated_states[i]->id());
+					p = server_->loadBean<TState>(-updated_states[i]->id());
+					assert(p.operator->()!=NULL);
+					assert(p);
+				}
 				
 				if(updated_states[i]->id()>0) {
 					id_conv_map_2server[net_header_.client_][updated_states[i]->id()] = -(ID)p.get_id();
