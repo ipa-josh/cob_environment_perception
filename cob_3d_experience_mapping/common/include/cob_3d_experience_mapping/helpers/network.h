@@ -12,7 +12,7 @@ class PackedStream: public std::streambuf
 {
     std::iostream &ios_;
     uint32_t pos_, size_;
-    std::vector<char> buffer_;
+    std::vector<char> buffer_, read_buffer_;
     
     void new_frame() {
 		buffer_.resize(4);
@@ -27,6 +27,7 @@ public:
     PackedStream(std::iostream &ios) :
         ios_(ios), pos_(4), size_(0)
     {
+        setg(0, 0, 0);
 		new_frame();
     }
 
@@ -38,15 +39,24 @@ public:
     virtual std::streambuf::int_type underflow()
     {
 		DBG_PRINTF("underflow1\n");
-		while(pos_<4)
-			((char*)&size_)[pos_++] = ios_.get();
+		if(pos_<4) {
+			ios_.read((char*)&size_, 4-pos_);
+			pos_=4;
+			read_buffer_.resize(size_-4);
+		}
+		
 		DBG_PRINTF("underflow2 %d %d\n", pos_, get_size());
 		if(pos_>=get_size()) {
 			size_ = pos_ = 0;
 			return traits_type::eof();
 		}
-		++pos_;
-        return traits_type::to_int_type(ios_.get());
+		
+		ios_.read(&read_buffer_[0], size_-4);
+		pos_+=read_buffer_.size();
+        setg(&read_buffer_[0], &read_buffer_[0], &read_buffer_[0]+read_buffer_.size());
+		size_ = pos_ = 0;
+        
+        return traits_type::to_int_type(*this->gptr());
     }
 
     virtual std::streambuf::int_type overflow(std::streambuf::int_type value)
