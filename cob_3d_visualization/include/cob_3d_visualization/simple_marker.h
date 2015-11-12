@@ -354,6 +354,41 @@ namespace cob_3d_visualization {
 	    
 		}
 		
+		template<class Vector>
+		void bar_radial(const float radius_outer, const Vector &center, const std::vector<std_msgs::ColorRGBA> &colors, const float alpha_start=0, const float alpha_end=2*M_PI, const float radius_inner=0.f, const int resolution=64) {
+			primitive(center, 1., visualization_msgs::Marker::TRIANGLE_LIST);
+
+			marker_.points.resize (6*colors.size());
+		
+			for(size_t i=0; i<6*colors.size();) {
+			  marker_.colors.insert(marker_.colors.end(), 16, colors[i/6]);
+			  
+			  const float alpha2 = (i/6)*std::abs(alpha_end-alpha_start)/colors.size() + alpha_start;
+			  const float alpha1 = (((i/6)+1)%resolution)*std::abs(alpha_end-alpha_start)/colors.size() + alpha_start;
+			  
+			  marker_.points[i+3].x = marker_.points[i].x = radius_inner*std::cos(alpha1);
+			  marker_.points[i+3].y = marker_.points[i].y = radius_inner*std::sin(alpha1);
+			  marker_.points[i+3].z = marker_.points[i].z = 0;
+			  ++i;
+			  
+			  marker_.points[i+4].x = marker_.points[i].x = radius_outer*std::cos(alpha2);
+			  marker_.points[i+4].y = marker_.points[i].y = radius_outer*std::sin(alpha2);
+			  marker_.points[i+4].z = marker_.points[i].z = 0;
+			  ++i;
+			  
+			  marker_.points[i].x = radius_outer*std::cos(alpha1);
+			  marker_.points[i].y = radius_outer*std::sin(alpha1);
+			  marker_.points[i].z = 0;
+			  i+=2;
+			  
+			  marker_.points[i].x = radius_inner*std::cos(alpha2);
+			  marker_.points[i].y = radius_inner*std::sin(alpha2);
+			  marker_.points[i].z = 0;
+			  i+=2;
+			}
+	    
+		}
+		
 		inline RvizMarker &color(const double r, const double g,  const double b, const double a=1.) {
 			marker_.color.a = a;
 			marker_.color.r = r;
