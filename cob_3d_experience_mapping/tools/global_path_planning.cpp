@@ -13,6 +13,7 @@
 #include <boost/tokenizer.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/random/poisson_distribution.hpp>
 
 #include <cob_3d_experience_mapping/SetGoalAction.h>
 #include <actionlib/server/simple_action_server.h>
@@ -107,6 +108,8 @@ class MainNode {
 	struct Slot {
 		double prob_;
 		Eigen::Vector2f twist_;
+		
+		Slot(const double v, const double r) : prob_(0), twist_(v,r) {}
 	};
 	
 	std::vector<Slot> slots_;
@@ -117,13 +120,13 @@ class MainNode {
 		slots_.clear();
 		
 		for(Iterator it=begin; it!=end; it++) {
-			double vel = it->linear.x;
-			double rot = it->angular.z;
+			double vel = factor*it->linear.x;
+			double rot = factor*it->angular.z;
 			
 			double dur = std::max(std::abs(vel)/max_vel_, std::abs(rot)/max_rot_);
 			int slots = (int)(dur/fequency_)+1;
 			
-			//slots_.insert();
+			slots_.insert(slots_.end(), slots, Slot(vel/slots, rot/slots));
 		}
 	}
 	
@@ -149,10 +152,17 @@ public:
 		ros::param::param<double>("max_vel", 		max_vel_, max_vel_);
 		ros::param::param<double>("max_rot", 		max_rot_, max_rot_);
 		
+		boost::poisson_distribution<int> pdist(1);
+		
 		srv_query_path_ = nh_.serviceClient<cob_3d_experience_mapping::QueryPath>("query_path");
 		sub_action_     = nh_.subscribe("action", 1, &MainNode::cb_action, this);
 		
 		server_set_goal_.start();
+	}
+	
+	double frequency() const {return fequency_;}
+	
+	void cycle() {
 	}
 };
 
@@ -161,7 +171,11 @@ int main(int argc, char **argv) {
     
 	MainNode mn;
 	
-	ros::spin();
+	ros::Rate r(mn.frequency());
+	while(ros::ok()) {
+		mn.cycle();
+		ros::spinOnce();
+	}
 	
 	return 0;
 }
