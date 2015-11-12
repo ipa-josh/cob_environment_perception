@@ -13,6 +13,7 @@ class PackedStream: public std::streambuf
     std::iostream &ios_;
     uint32_t pos_, size_;
     std::vector<char> buffer_, read_buffer_;
+    bool close_after_packet_;
     
     void new_frame() {
 		buffer_.resize(4);
@@ -25,7 +26,7 @@ class PackedStream: public std::streambuf
     
 public:
     PackedStream(std::iostream &ios) :
-        ios_(ios), pos_(4), size_(0)
+        ios_(ios), pos_(4), size_(0), close_after_packet_(false)
     {
         setg(0, 0, 0);
 		new_frame();
@@ -35,9 +36,16 @@ public:
     {
         sync();
     }
+    
+    void set_close_after_packet(const bool b) {size_ = pos_ = 0; close_after_packet_=b;}
 
     virtual std::streambuf::int_type underflow()
     {
+		if(pos_>=4) {
+			if(close_after_packet_) return traits_type::eof();
+			size_ = pos_ = 0;
+		}
+		
 		DBG_PRINTF("underflow1\n");
 		if(pos_<4) {
 			ios_.read((char*)&size_, 4-pos_);
@@ -54,7 +62,6 @@ public:
 		ios_.read(&read_buffer_[0], size_-4);
 		pos_+=read_buffer_.size();
         setg(&read_buffer_[0], &read_buffer_[0], &read_buffer_[0]+read_buffer_.size());
-		size_ = pos_ = 0;
         
         return traits_type::to_int_type(*this->gptr());
     }
@@ -93,6 +100,8 @@ public:
     void finish() {
 		((PackedStream*)rdbuf())->finish();
 	}
+	
+    void set_close_after_packet(const bool b) {((PackedStream*)rdbuf())->set_close_after_packet(b);}
 };
 
 	
@@ -147,10 +156,14 @@ void sync_content_client(TContent &s, const char * addr, const char * port, cons
     typename TContent::TNetworkHeader request_header = s.get_network_header();
 	export_content<TArchiveOut>(request_header, stream);
 	stream.finish();
+	
+	IOPackedStream *packed_stream = dynamic_cast<IOPackedStream*>(&stream);
 		
-    /*if(request_header.compression_)
-		export_content_compr<TArchiveOut>(s, stream);	
-    else*/
+    if(packed_stream && request_header.compression_) {
+		packed_stream->set_close_after_packet(true);
+		export_content_compr<TArchiveOut>(s, stream);
+	}
+    else
 		export_content<TArchiveOut>(s, stream);
 	stream.finish();
 		
@@ -163,9 +176,11 @@ void sync_content_client(TContent &s, const char * addr, const char * port, cons
 	
 	DBG_PRINTF("got header\n");
 	
-    /*if(response_header.compression_)
+    if(packed_stream && response_header.compression_) {
+		packed_stream->set_close_after_packet(true);
 		import_content_compr<TArchiveIn>(s, stream);
-	else*/
+	}
+	else
 		import_content<TArchiveIn>(s, stream);
 		
 	DBG_PRINTF("got data\n");
@@ -184,14 +199,17 @@ void sync_content_server_import_header(TContent &s, std::iostream &stream){
 template<class TArchiveIn, class TArchiveOut, class TContent>
 void sync_content_server_import(TContent &s, std::iostream &stream){    
     assert(stream.good());
+	IOPackedStream *packed_stream = dynamic_cast<IOPackedStream*>(&stream);
     
 	DBG_PRINTF("waiting for data\n");
 	
 	try {
 	
-    /*if(s.get_network_header().compression_)
+    if(packed_stream && s.get_network_header().compression_) {
+		packed_stream->set_close_after_packet(true);
 		import_content_compr<TArchiveIn>(s, stream);
-	else*/
+	}
+	else
 		import_content<TArchiveIn>(s, stream);
 		
 		DBG_PRINTF("got data\n");
@@ -213,9 +231,11 @@ void sync_content_server_export(TContent &s, std::iostream &stream){
 	
 	DBG_PRINTF("sent header\n");
 		
-    /*if(request_header.compression_)
-		export_content_compr<TArchiveOut>(s, stream);	
-    else*/
+    if(packed_stream && request_header.compression_) {
+		packed_stream->set_close_after_packet(true);
+		export_content_compr<TArchiveOut>(s, stream);
+	}
+    else
 		export_content<TArchiveOut>(s, stream);
 	if(packed_stream) packed_stream->finish();
 		
