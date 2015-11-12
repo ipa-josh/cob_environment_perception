@@ -18,11 +18,10 @@ bool graph_shortest_path(boost::shared_ptr<TDijkstra> &dijkstra, const TNode &sr
 	return true;
 }
 
-template<class TAction, class TCell, class TGraph, class TContext, class TMapCells, class TMapTransformations, class TTransformation>
-TAction find_next_action(const TCell &src, const TCell &tgt, TGraph &graph, TContext &ctxt, TMapCells &cells, TMapTransformations &trans)
+template<class TAction, class TState, class TGraph, class TMapStates, class TMapTransformations, class TTransformation>
+TAction find_next_action(const typename TState::TPtr &src, const typename TState::TPtr &tgt, TGraph &graph,  TMapStates &cells, TMapTransformations &trans)
 {
 	typedef typename lemon::Dijkstra<lemon::Undirector<TGraph> > TSearchAlgo;
-	typedef typename TContext::TState TState;
 	typedef typename TState::TArcOutIterator TArcIter_out;
 	typedef typename TState::TArcInIterator TArcIter_in;
 	
@@ -79,5 +78,49 @@ TAction find_next_action(const TCell &src, const TCell &tgt, TGraph &graph, TCon
     
 	* 
 	* */
+}
+
+template<class TAction, class TState, class TGraph, class TMapStates, class TMapTransformations, class TTransformation>
+bool find_all_actions(const typename TState::TPtr &src, const typename TState::TPtr &tgt, TGraph &graph, TMapStates &states, TMapTransformations &trans, std::vector<TAction> &actions)
+{
+	typedef typename lemon::Dijkstra<TGraph> TSearchAlgo;
+	typedef typename TState::TArcOutIterator TArcIter_out;
+	typedef typename TState::TArcInIterator TArcIter_in;
+	
+	if(src->node()==tgt->node()) {
+		DBG_PRINTF("reached as we are already here");
+		return true;
+	}
+	
+	boost::shared_ptr<TSearchAlgo> res;
+	typename TSearchAlgo::LengthMap length_map(graph,1);
+	if(!graph_shortest_path<TSearchAlgo>(res, src->node(), tgt->node(), graph, length_map ))
+		return false;
+	
+	typename TGraph::Node next_node, tmp=tgt->node();
+	while(tmp!=src->node()) {
+		next_node = tmp;
+		tmp = res->predNode(tmp);
+		
+		const typename TState::TPtr &from = states[tmp];
+		//const typename TState::TPtr &to   = states[next_node];
+		
+		bool found = false;
+		for(TArcIter_out ait(from->arc_out_begin(graph)); ait!=from->arc_out_end(graph); ++ait) {
+			if(from->opposite_node(graph, ait)==next_node) {
+				DBG_PRINTF("found next action (1)");
+				actions.push_back(TAction( trans[ait] ));
+				found = true;
+				break;
+			}
+		}
+		assert(found);
+		if(!found) {
+			actions.clear();
+			return false;
+		}
+	}
+	
+	return false;
 }
 

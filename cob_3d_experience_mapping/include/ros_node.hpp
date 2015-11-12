@@ -1,6 +1,7 @@
 
 #include <nav_msgs/Odometry.h>
 #include <cob_3d_experience_mapping/SensorInfoArray.h>
+#include <cob_3d_experience_mapping/QueryPath.h>
 //#include <tf/transform_listener.h>
 #include <ratslam_ros/TopologicalAction.h>
 #include <std_msgs/Int32.h>
@@ -100,6 +101,7 @@ private:
 
 	ros::Subscriber sub_odometry_, sub_sensor_info_, sub_view_template_, sub_view_id_;
 	ros::Publisher pub_top_action_;
+	ros::ServiceServer srv_query_path_;
 	ros::Time time_last_odom_;
 	
 	bool step_mode_;
@@ -157,6 +159,8 @@ public:
     //file_gpx_ << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\" ?>\r\n<gpx xmlns=\"http://www.topografix.com/GPX/1/1\" version=\"1.1\" creator=\"Wikipedia\"\r\n    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\r\n    xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd\"><trk><name>Trackname2</name><trkseg>";
 
 	  cob_3d_experience_mapping::algorithms::init<Transformation>(graph_, ctxt_, states_, trans_);
+	  
+	  srv_query_path_ = n->advertiseService("query_path", &ROS_Node::srv_query_path, this);
 	  
 	  printf("init done\n");
 	  
@@ -223,12 +227,17 @@ public:
 		  ROS_INFO("on odom.");
 
 		  typename Transformation::TLink link;
+		  link.fill(0);
 		  link(0) = odom->twist.twist.linear.x;
-		  link(1) = odom->twist.twist.linear.y;
+		  //link(1) = odom->twist.twist.linear.y;
 		  link(2) = odom->twist.twist.angular.z;
 		  if(link(2)>M_PI)  link(2) -= 2*M_PI;
 		  if(link(2)<-M_PI) link(2) += 2*M_PI;
 		  
+		  if(link(0)<0) {
+			  link(1) = -link(0);
+			  link(0) = 0;
+		  }
 		  if(link(2)<0) {
 			  link(3) = -link(2);
 			  link(2) = 0;
@@ -238,7 +247,7 @@ public:
 		  
 		  if(!step_mode_) link *= (odom->header.stamp-time_last_odom_).toSec();
 		  
-		  else if(std::abs(link(2))>0.4) link(2) *= 0.4/std::abs(link(2)); //TODO: TESTING ONLY!!!
+		  //else if(std::abs(link(2))>0.4) link(2) *= 0.4/std::abs(link(2)); //TODO: TESTING ONLY!!!
 		  
 		  if(link.squaredNorm()<=0) return;
 
@@ -304,7 +313,54 @@ public:
 	  time_last_odom_ = odom->header.stamp;
 	  printf("\n");
   }
+  
+  typename State::TPtr get_node_from_id(const int id) const {
+	for(typename TGraph::NodeIt it(graph_); it!=lemon::INVALID; ++it)
+		if(states_[it]->id()==id) return states_[it];
+	  return typename State::TPtr();
+  }
+  
+  geometry_msgs::Twist transformation2twist(const Transformation &tf) {
+	  geometry_msgs::Twist twist;
+	  
+	  twist.linear.x = tf.get_data()(0)-tf.get_data()(1);
+	  twist.linear.y = 0;
+	  twist.linear.z = 0;
+	  
+	  twist.angular.x = 0;
+	  twist.angular.y = 0;
+	  twist.angular.z = tf.get_data()(2)-tf.get_data()(3);
+	  
+	  return twist;
+  }
+  
+  bool srv_query_path(cob_3d_experience_mapping::QueryPath::Request &req, cob_3d_experience_mapping::QueryPath::Response &res)
+  {
+	  typedef cob_3d_experience_mapping::ActionSearchResult<Transformation> TAction;
+	  
+	  typename State::TPtr tgt = get_node_from_id(req.node_id);
+	  std::vector<TAction> actions;
+	  res.invert = false;
+	  
+	  if(cob_3d_experience_mapping::algorithms::find_all_actions<TAction, State, TGraph, TMapStates, TMapTransformations, Transformation>
+			(tgt, ctxt_.current_active_state(), graph_, states_, trans_, actions))
+		return true;
+
+	  if(actions.size()==0) {
+		res.invert = true;
+		if(cob_3d_experience_mapping::algorithms::find_all_actions<TAction, State, TGraph, TMapStates, TMapTransformations, Transformation>
+			(ctxt_.current_active_state(), tgt, graph_, states_, trans_, actions))
+			return true;
+	  }
+	  
+	  for(size_t i=0; i<actions.size(); i++)
+		res.actions.push_back(transformation2twist(*actions[i].transformation()));
+		
+	  return true;
+  }
+  
 };
+
 
 /*
 #ifdef COMPILE_NODELET
