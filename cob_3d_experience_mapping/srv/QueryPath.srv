@@ -1,0 +1,6 @@
+# Define the goal
+int32 node_id
+---
+# Define the result
+bool invert
+geometry_msgs/Twist[] actions

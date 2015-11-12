@@ -1,0 +1,10 @@
+# Define the goal
+string goal #e.g. node:123
+---
+# Define the result
+bool success
+string msg
+---
+# Define a feedback message
+float32 percent_complete
+string msg
