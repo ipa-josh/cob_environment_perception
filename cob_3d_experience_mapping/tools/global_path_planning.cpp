@@ -5,208 +5,154 @@
 #include <boost/thread/mutex.hpp>
 #include <geometry_msgs/Twist.h>
 
+#include <ratslam_ros/TopologicalAction.h>
+#include <cob_3d_experience_mapping/QueryPath.h>
 
-struct PathProbability {
-	double phi_res;
-	std::vector<double> possible_paths;
-};
+#include <Eigen/Core>
 
-PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const double max_phi_speed, const size_t path_resolution, const double vel, double &within_prob, const double fact_right = 0.7, const double fact_left = 0.75, const double thr = 10.) {
-	PathProbability pp;
-	
-	//init.
-	pp.phi_res = max_phi_speed/path_resolution;
-	pp.possible_paths.resize(2*path_resolution+1, 0.);
-	within_prob = 0;
-	
-	printf("-----------------------------------------\n");
-	
-	//inflated obstacles to path (assuming constant speed)
-	for(unsigned int x=0; x<grid.info.width; x++) {
-		//const double rx = x*grid.info.resolution;
-		const double rx = (x-grid.info.width /2.)*grid.info.resolution;// - grid.info.origin.position.x;
-			
-		for(unsigned int y=0; y<grid.info.height; y++) {
-			int8_t o = grid.data[y*grid.info.width+x];
-			if(o<0) o=0;
-			const double val = std::min(1., o/thr);
-			
-			const double ry = (y-grid.info.height/2.)*grid.info.resolution;// - grid.info.origin.position.y;
-			//const double ry = y*grid.info.resolution;
-			if(rx<=0) continue;
-			
-			if(std::abs(rx)+std::abs(ry)<0.25) {
-				within_prob = std::max(within_prob, val);
-				printf("O");
-			}
-			else
-				printf("%c", o>thr?'x':' ');
-			
-			const double phi1 = std::atan2(ry*vel,rx);
-			//printf(" %f ", phi1);
-			const size_t ind = (size_t)(phi1/pp.phi_res + pp.possible_paths.size()/2);
-			if(ind<0 || ind>=pp.possible_paths.size()) continue;
-			
-			pp.possible_paths[ind] = std::max(pp.possible_paths[ind], val);
-		}
-		printf("\n");
-	}
-	
-	//spread distances to keep track to mid
-	for(size_t i=0; i<pp.possible_paths.size()-1; i++)
-		pp.possible_paths[i+1] = std::max(pp.possible_paths[i+1], pp.possible_paths[i]*fact_right);
-	for(size_t i=pp.possible_paths.size()-1; i>0; i--)
-		pp.possible_paths[i-1] = std::max(pp.possible_paths[i-1], pp.possible_paths[i]*fact_left);
-		
-	return pp;
+#include <boost/tokenizer.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
+
+#include <cob_3d_experience_mapping/SetGoalAction.h>
+#include <actionlib/server/simple_action_server.h>
+
+typedef actionlib::SimpleActionServer<cob_3d_experience_mapping::SetGoalAction> Server_SetGoal;
+
+/**
+ * parse string
+ */
+template<class T>
+void tokenizeV(const std::string &s, std::vector<T> &o, const char escape=':')
+{
+  typedef boost::tokenizer<boost::escaped_list_separator<char> >  tok_t;
+
+  boost::escaped_list_separator<char> els(escape);
+  tok_t tok(s, els);
+  
+  for(tok_t::iterator j (tok.begin());
+      j != tok.end();
+      ++j)
+  {
+    std::string f(*j);
+    boost::trim(f);
+    o.push_back(boost::lexical_cast<T>(f));
+  }
 }
 
 class MainNode {
+	
+	enum {INVALID_NODE_ID=0};
+	
 
 	//parameters
-	double max_phi_speed_;
-	int path_resolution_;
-	double fact_right_;
-	double fact_left_;
-	double occ_thr_;
+	double fequency_;
+	double max_vel_, max_rot_;
 	
-	ros::NodeHandle nh_;	
-	nav_msgs::OccupancyGrid grid_;
+	ros::NodeHandle nh_;
+	ros::Subscriber sub_action_;
+	ros::ServiceClient srv_query_path_;
 	
-	ros::Subscriber sub_req_, sub_costmap_;
-	ros::Publisher pub_odom_, pub_feature_;
+	int target_id_, max_node_id_;
 	
-	ros::Timer timer_explore_;
+	//action servers
+	Server_SetGoal server_set_goal_;
 	
-	boost::mutex mtx_;
+	void exe_set_goal(const cob_3d_experience_mapping::SetGoalGoalConstPtr &goal) {
+		std::vector<std::string> vgoal;
+		tokenizeV<std::string>(goal->goal, vgoal);
+		
+		cob_3d_experience_mapping::SetGoalResult result;
+		result.success = false;
+		
+		if(vgoal.size()!=2) {
+			ROS_ERROR("%s", (result.msg = "malformed goal. Example: node:123").c_str());
+			server_set_goal_.setSucceeded(result);
+		}
+		if(vgoal[0]=="node") {
+			ROS_ERROR("%s", (result.msg = "malformed goal. Example: node:123").c_str());
+			server_set_goal_.setSucceeded(result);
+		}
+		
+		target_id_ = boost::lexical_cast<int>(vgoal[1]);
+		
+		query_path();
+		
+	}
+	
+	bool query_path() {
+		assert(target_id_!=INVALID_NODE_ID);
+		
+		if(target_id_==INVALID_NODE_ID) {
+			ROS_WARN("invalid target id set");
+			return false;
+		}
+		
+		cob_3d_experience_mapping::QueryPath srv;
+		srv.request.node_id = target_id_;
+		
+		if(!srv_query_path_.call(srv)) {
+			ROS_ERROR("failed to call query path service");
+			return false;
+		}
+		
+		if(srv.response.invert)
+			generate_path(srv.response.actions.rbegin(), srv.response.actions.rend(), -1);
+		else
+			generate_path(srv.response.actions.begin(), srv.response.actions.end(), 1);
+		
+		return true;
+	}
+	
+	struct Slot {
+		double prob_;
+		Eigen::Vector2f twist_;
+	};
+	
+	std::vector<Slot> slots_;
+	
+	template<class Iterator>
+	void generate_path(const Iterator &begin, const Iterator &end, const float factor=1.f)
+	{
+		slots_.clear();
+		
+		for(Iterator it=begin; it!=end; it++) {
+			double vel = it->linear.x;
+			double rot = it->angular.z;
+			
+			double dur = std::max(std::abs(vel)/max_vel_, std::abs(rot)/max_rot_);
+			int slots = (int)(dur/fequency_)+1;
+			
+			//slots_.insert();
+		}
+	}
+	
+	void cb_action(const ratslam_ros::TopologicalActionConstPtr &msg) {
+		const int id = msg->dest_id+1;
+		const bool reloc = id<max_node_id_;
+		max_node_id_ = std::max(id, max_node_id_);
+		
+		if(target_id_ == INVALID_NODE_ID) return;
+		
+		if(reloc)
+			query_path();
+	}
 	
 public:
 
 	MainNode() :
-		max_phi_speed_(0.35), path_resolution_(25),
-		fact_right_(0.7), fact_left_(0.75), occ_thr_(30.)
+		fequency_(10.), max_vel_(0.2), max_rot_(0.2),
+		target_id_(INVALID_NODE_ID), max_node_id_(0),
+		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false)
 	{
-		ros::param::param<double>("max_phi_speed", 		max_phi_speed_, max_phi_speed_);
-		ros::param::param<double>("fact_right", 		fact_right_, fact_right_);
-		ros::param::param<double>("fact_left", 			fact_left_, fact_left_);
-		ros::param::param<double>("occ_thr", 			occ_thr_, occ_thr_);
-		ros::param::param<int>   ("path_resolution", 	path_resolution_, path_resolution_);
+		ros::param::param<double>("fequency", 		fequency_, fequency_);
+		ros::param::param<double>("max_vel", 		max_vel_, max_vel_);
+		ros::param::param<double>("max_rot", 		max_rot_, max_rot_);
 		
-		//subscribe to desired odom. message (->action of robot)
-		sub_req_     = nh_.subscribe("desired_odom", 1, &MainNode::cb_desired_odom,   this);
-		sub_costmap_ = nh_.subscribe("costmap",      1, &MainNode::on_costmap_update, this);
+		srv_query_path_ = nh_.serviceClient<cob_3d_experience_mapping::QueryPath>("query_path");
+		sub_action_     = nh_.subscribe("action", 1, &MainNode::cb_action, this);
 		
-		pub_odom_    = nh_.advertise<geometry_msgs::Twist>("action", 5);
-		pub_feature_ = nh_.advertise<std_msgs::Float32MultiArray>("feature", 5);
-		
-		timer_explore_ = nh_.createTimer(ros::Duration(1.), &MainNode::explore, this);
-	}
-	
-	void on_costmap_update(const nav_msgs::OccupancyGrid::ConstPtr &msg) {
-		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
-		grid_ = *msg;
-		
-		calc_feature();
-	}
-	
-	void calc_feature() {
-		const double vel = 0.3;
-		
-		//boost::unique_lock<boost::mutex> scoped_lock(mtx_);
-		double within_prob;
-		PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, vel, within_prob, fact_right_, fact_left_, occ_thr_);
-		
-		std_msgs::Float32MultiArray msg;
-		msg.layout.dim.resize(1);
-		msg.layout.data_offset = 0;
-		msg.layout.dim[0].size = pp.possible_paths.size();
-		msg.layout.dim[0].label= "costs per angle";
-		
-		for(size_t i=0; i<pp.possible_paths.size(); i++)
-			msg.data.push_back(pp.possible_paths[i]);
-		
-		pub_feature_.publish(msg);
-	}
-	
-	ros::Time sleep_;
-	void explore(const ros::TimerEvent& event) {
-		if(ros::Time::now()<sleep_) return;
-		
-		const double vel = 0.2;
-		const double interval = 10;
-		
-		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
-		double within_prob;
-		PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, vel, within_prob, fact_right_, fact_left_, occ_thr_);
-		
-		geometry_msgs::Twist action;
-		
-		size_t ind = pp.possible_paths.size();
-		double low=0, high=0;
-		for(size_t i=0; i<pp.possible_paths.size(); i++) {
-			if(pp.possible_paths[i]>=1) continue;
-			
-			pp.possible_paths[i] += 0.1*std::abs((int)i-(int)pp.possible_paths.size()/2)/(double)pp.possible_paths.size();
-			pp.possible_paths[i] *= std::sin(M_PI*( i/(double)pp.possible_paths.size() + ros::Time::now().toSec()/interval ))*0.9 + 0.1;
-			if(ind>=pp.possible_paths.size() || pp.possible_paths[i]<pp.possible_paths[ind])
-				ind = i;
-				
-			if(i<pp.possible_paths.size()/2) low *= pp.possible_paths[i];
-			else if(i>pp.possible_paths.size()/2) high *= pp.possible_paths[i];
-		}
-		
-		if(ind<pp.possible_paths.size()) {
-			action.angular.z = ((int)ind-(int)pp.possible_paths.size()/2) * pp.phi_res;
-			if(within_prob<1) action.linear.x  = vel;
-			else if(!action.angular.z) action.angular.z = low<high?max_phi_speed_/2 : -max_phi_speed_/2;
-		}
-		else {
-			if(within_prob>=1) { //we are in an obstacle !
-				action.linear.x  = -vel/2; //move back
-			}
-			else
-				action.angular.z = max_phi_speed_/2;
-		}
-		
-		if(!action.linear.x)
-			sleep_ = ros::Time::now() + ros::Duration(4.);
-			
-		action.linear.x  /= 1+3*std::abs(action.angular.z);
-		action.angular.z /= 1;
-		pub_odom_.publish(action);
-	}
-
-	void cb_desired_odom(const nav_msgs::Odometry::ConstPtr &msg) {
-		ROS_INFO("cb_desired_odom");
-		
-		geometry_msgs::Twist action = msg->twist.twist;
-		if(msg->twist.twist.linear.x!=0) { //non-special case
-			boost::unique_lock<boost::mutex> scoped_lock(mtx_);
-			
-			PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, msg->twist.twist.linear.x, fact_right_, fact_left_, occ_thr_);
-			const size_t org_ind = (size_t)(msg->twist.twist.angular.z/pp.phi_res + pp.possible_paths.size()/2);
-			if(org_ind<0 || org_ind>=pp.possible_paths.size()) {
-				ROS_ERROR("desired rotation speed is not possible, perhaps wrong configuration?");
-				return;
-			}
-			
-			if(pp.possible_paths[org_ind]>=1) {
-				ROS_ERROR("path is block, waiting...");
-				return;
-			}
-			
-			size_t ind = org_ind;
-			
-			//search for local minima
-			while(ind+1<pp.possible_paths.size() && pp.possible_paths[ind]>pp.possible_paths[ind+1]+(ind-org_ind)*(1-fact_right_) )
-				++ind;
-			while(ind<=org_ind && ind>0          && pp.possible_paths[ind]>pp.possible_paths[ind-1]+(org_ind-ind)*(1-fact_left_) )
-				--ind;
-			
-			action.angular.z = ((int)ind-(int)pp.possible_paths.size()/2) * pp.phi_res;
-		}
-		
-		pub_odom_.publish(action);
+		server_set_goal_.start();
 	}
 };
 

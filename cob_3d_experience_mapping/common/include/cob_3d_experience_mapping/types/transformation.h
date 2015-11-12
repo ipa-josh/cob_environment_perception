@@ -22,6 +22,8 @@ namespace cob_3d_experience_mapping {
 		
 		bool found() {return found_;}
 		bool reached() {return found_ && !trans_;}
+		
+		const typename TTransformation::TPtr &transformation() const {return trans_;}
 	};
 	
 	template<typename _TType, int NUM_TRANS, int NUM_ROT>
