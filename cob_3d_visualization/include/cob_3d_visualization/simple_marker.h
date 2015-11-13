@@ -228,6 +228,7 @@ namespace cob_3d_visualization {
 			return *this;
 		}
 		
+#ifdef PCL_VERSION
 		void mesh(const pcl::PolygonMesh &mesh) {
 			pcl::PointCloud<pcl::PointXYZ> points;
 			//pcl::fromROSMsg(mesh.cloud, points);
@@ -269,6 +270,7 @@ namespace cob_3d_visualization {
 					marker_.colors.push_back(c);
 			}
 		}
+#endif
 		
 		template<class Vector>
 		void arrow(const Vector &start, const Vector &end, const float scale=0) {
@@ -361,10 +363,10 @@ namespace cob_3d_visualization {
 			marker_.points.resize (6*colors.size());
 		
 			for(size_t i=0; i<6*colors.size();) {
-			  marker_.colors.insert(marker_.colors.end(), 16, colors[i/6]);
+			  marker_.colors.insert(marker_.colors.end(), 6, colors[i/6]);
 			  
 			  const float alpha2 = (i/6)*std::abs(alpha_end-alpha_start)/colors.size() + alpha_start;
-			  const float alpha1 = (((i/6)+1)%colors.size())*std::abs(alpha_end-alpha_start)/colors.size() + alpha_start;
+			  const float alpha1 = ((i/6)+1)*std::abs(alpha_end-alpha_start)/colors.size() + alpha_start;
 			  
 			  marker_.points[i+3].x = marker_.points[i].x = radius_inner*std::cos(alpha1);
 			  marker_.points[i+3].y = marker_.points[i].y = radius_inner*std::sin(alpha1);
@@ -386,7 +388,8 @@ namespace cob_3d_visualization {
 			  marker_.points[i].z = 0;
 			  i+=2;
 			}
-	    
+		
+			ROS_ASSERT(marker_.points.size()==marker_.colors.size());
 		}
 		
 		inline RvizMarker &color(const double r, const double g,  const double b, const double a=1.) {

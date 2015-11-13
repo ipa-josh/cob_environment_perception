@@ -4,7 +4,8 @@
 #include <std_msgs/Float32MultiArray.h>
 #include <boost/thread/mutex.hpp>
 #include <geometry_msgs/Twist.h>
-
+#include <Eigen/Core>
+#include <cob_3d_visualization/simple_marker.h>
 
 struct PathProbability {
 	double phi_res;
@@ -35,7 +36,7 @@ PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const
 			//const double ry = y*grid.info.resolution;
 			if(rx<=0) continue;
 			
-			if(std::abs(rx)+std::abs(ry)<0.25) {
+			if(std::abs(rx)+std::abs(ry)<0.05) {
 				within_prob = std::max(within_prob, val);
 				printf("O");
 			}
@@ -83,7 +84,7 @@ class MainNode {
 public:
 
 	MainNode() :
-		max_phi_speed_(0.35), path_resolution_(25),
+		max_phi_speed_(0.7), path_resolution_(25),
 		fact_right_(0.7), fact_left_(0.75), occ_thr_(30.)
 	{
 		ros::param::param<double>("max_phi_speed", 		max_phi_speed_, max_phi_speed_);
@@ -105,6 +106,8 @@ public:
 	void on_costmap_update(const nav_msgs::OccupancyGrid::ConstPtr &msg) {
 		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 		grid_ = *msg;
+		
+		cob_3d_visualization::RvizMarkerManager::get().setFrameId(msg->header.frame_id);
 		
 		calc_feature();
 	}
@@ -138,6 +141,20 @@ public:
 		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 		double within_prob;
 		PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, vel, within_prob, fact_right_, fact_left_, occ_thr_);
+			
+		cob_3d_visualization::RvizMarkerManager::get().clear();
+		{
+			cob_3d_visualization::RvizMarker scene;
+			std::vector<std_msgs::ColorRGBA> colors(pp.possible_paths.size());
+			for(size_t i=0; i<colors.size(); i++) {
+				colors[i].r = pp.possible_paths[i];
+				colors[i].g = 1-pp.possible_paths[i];
+				colors[i].b = 0;
+				colors[i].a = 1;
+			}
+			scene.bar_radial(2*vel, Eigen::Vector3f::Zero(), colors, -max_phi_speed_, max_phi_speed_, vel);
+		}
+		cob_3d_visualization::RvizMarkerManager::get().publish();
 		
 		geometry_msgs::Twist action;
 		
@@ -156,7 +173,7 @@ public:
 		}
 		
 		if(ind<pp.possible_paths.size()) {
-			action.angular.z = ((int)ind-(int)pp.possible_paths.size()/2) * pp.phi_res;
+			action.angular.z = ((int)ind-(int)pp.possible_paths.size()/2)*pp.phi_res;
 			if(within_prob<1) action.linear.x  = vel;
 			else if(!action.angular.z) action.angular.z = low<high?max_phi_speed_/2 : -max_phi_speed_/2;
 		}
@@ -184,6 +201,7 @@ public:
 			boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 			
 			PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, msg->twist.twist.linear.x, fact_right_, fact_left_, occ_thr_);
+ 
 			const size_t org_ind = (size_t)(msg->twist.twist.angular.z/pp.phi_res + pp.possible_paths.size()/2);
 			if(org_ind<0 || org_ind>=pp.possible_paths.size()) {
 				ROS_ERROR("desired rotation speed is not possible, perhaps wrong configuration?");
@@ -203,7 +221,7 @@ public:
 			while(ind<=org_ind && ind>0          && pp.possible_paths[ind]>pp.possible_paths[ind-1]+(org_ind-ind)*(1-fact_left_) )
 				--ind;
 			
-			action.angular.z = ((int)ind-(int)pp.possible_paths.size()/2) * pp.phi_res;
+			action.angular.z = ((int)ind-(int)pp.possible_paths.size()/2)*pp.phi_res;
 		}
 		
 		pub_odom_.publish(action);
@@ -213,6 +231,7 @@ public:
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "local_path_planning");
     
+    cob_3d_visualization::RvizMarkerManager::get().createTopic("local_path_planning_marker").clearOld();
 	MainNode mn;
 	
 	ros::spin();
