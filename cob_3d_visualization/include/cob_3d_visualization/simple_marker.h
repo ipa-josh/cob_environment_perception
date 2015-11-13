@@ -355,7 +355,7 @@ namespace cob_3d_visualization {
 		}
 		
 		template<class Vector>
-		void bar_radial(const float radius_outer, const Vector &center, const std::vector<std_msgs::ColorRGBA> &colors, const float alpha_start=0, const float alpha_end=2*M_PI, const float radius_inner=0.f, const int resolution=64) {
+		void bar_radial(const float radius_outer, const Vector &center, const std::vector<std_msgs::ColorRGBA> &colors, const float alpha_start=0, const float alpha_end=2*M_PI, const float radius_inner=0.f) {
 			primitive(center, 1., visualization_msgs::Marker::TRIANGLE_LIST);
 
 			marker_.points.resize (6*colors.size());
@@ -364,7 +364,7 @@ namespace cob_3d_visualization {
 			  marker_.colors.insert(marker_.colors.end(), 16, colors[i/6]);
 			  
 			  const float alpha2 = (i/6)*std::abs(alpha_end-alpha_start)/colors.size() + alpha_start;
-			  const float alpha1 = (((i/6)+1)%resolution)*std::abs(alpha_end-alpha_start)/colors.size() + alpha_start;
+			  const float alpha1 = (((i/6)+1)%colors.size())*std::abs(alpha_end-alpha_start)/colors.size() + alpha_start;
 			  
 			  marker_.points[i+3].x = marker_.points[i].x = radius_inner*std::cos(alpha1);
 			  marker_.points[i+3].y = marker_.points[i].y = radius_inner*std::sin(alpha1);
