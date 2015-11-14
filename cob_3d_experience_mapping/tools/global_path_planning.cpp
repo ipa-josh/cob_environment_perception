@@ -109,6 +109,8 @@ class MainNode {
 		Eigen::Vector2d twist_;
 		
 		Slot(const double v, const double r) : twist_(v,r) {}
+		
+		inline double sim(const Eigen::Vector2d &odom) const {return 1.;}
 	};
 	
 	std::vector<Slot> slots_;
@@ -123,6 +125,13 @@ class MainNode {
 			for(size_t j=0; j<p.size(); j++)
 				out(i)+=in(i+j-off)*p(j);
 		}
+	}
+	
+	Eigen::VectorXd generate_dist() const {
+		Eigen::VectorXd dist;
+		//1. create triangular distribution from travelling distance (a=0, b=c=similiar distance)
+		//2. cross-correlation with normal distribution with variance = (default odom var. + unsimiliar distance)
+		return dist;
 	}
 	
 	void init_prob() {
