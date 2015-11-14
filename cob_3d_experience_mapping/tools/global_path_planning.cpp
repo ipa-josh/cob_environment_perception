@@ -13,7 +13,7 @@
 #include <boost/tokenizer.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/random/poisson_distribution.hpp>
+#include <boost/math/distributions/normal.hpp> // for normal_distribution
 
 #include <cob_3d_experience_mapping/SetGoalAction.h>
 #include <actionlib/server/simple_action_server.h>
@@ -49,6 +49,7 @@ class MainNode {
 	//parameters
 	double fequency_;
 	double max_vel_, max_rot_;
+	double expected_variance_;
 	
 	ros::NodeHandle nh_;
 	ros::Subscriber sub_action_;
@@ -110,6 +111,7 @@ class MainNode {
 		
 		Slot(const double v, const double r) : twist_(v,r) {}
 		
+		inline double dist(const Eigen::Vector2d &odom) const {return 1.;}
 		inline double sim(const Eigen::Vector2d &odom) const {return 1.;}
 	};
 	
@@ -127,11 +129,48 @@ class MainNode {
 		}
 	}
 	
-	Eigen::VectorXd generate_dist() const {
-		Eigen::VectorXd dist;
+	Eigen::VectorXd generate_dist(const Eigen::Vector2d &odom, const Slot &slot, size_t &offset, const double time) const {
+		using boost::math::normal;
+		
+		const double sim = slot.sim(odom);
+		const double dist = slot.dist(odom);
+		
+		assert(sim>=0 && sim<=1);
+		assert(dist>=0);
+		
+		const double scaled_def_odom_var = expected_variance_*time;
+		const double var = scaled_def_odom_var + (1-sim)*dist;
+		
+		offset = 3*(int)std::floor(var+0.5);
+		const size_t dist_len = (int)(dist+0.5) + 1;
+		Eigen::VectorXd dist(Eigen::VectorXd::Zero( dist_len  +  2*offset ));
+		
 		//1. create triangular distribution from travelling distance (a=0, b=c=similiar distance)
+		for(size_t i=0; i<dist_len; i++)
+			dist(i+offset) = ;
+		
 		//2. cross-correlation with normal distribution with variance = (default odom var. + unsimiliar distance)
+		normal n(0., var);
+		for(size_t i=off; i<in.rows()-p.size()+off; i++) {
+			for(size_t j=0; j<p.size(); j++)
+				out(i)+=in(i+j-off)*p(j);
+		}
+		pdf(n, )
+		
 		return dist;
+	}
+	
+	void on_odom(const Eigen::Vector2d &odom, const double time)
+	{
+		Eigen::VectorXd new_probs(Eigen::VectorXd::Zero(probs_.size()));
+		for(size_t i=0; i<slots_.size(); i++) {
+			size_t off = 0;
+			const Eigen::VectorXd p = generate_dist(odom, slots_[i], off, time);
+			
+			for(size_t j=(i>=off:0?off-i); j<(i+p.size()-off<new_probs.rows()?p.size():new_probs.rows()-i+off); j++)
+				new_probs(i)+=probs_(i+j-off)*p(j);
+		}
+		probs_ = new_probs;
 	}
 	
 	void init_prob() {
@@ -172,12 +211,14 @@ public:
 
 	MainNode() :
 		fequency_(10.), max_vel_(0.2), max_rot_(0.2),
+		expected_variance_(0.01),
 		target_id_(INVALID_NODE_ID), max_node_id_(0),
 		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false)
 	{
 		ros::param::param<double>("fequency", 		fequency_, fequency_);
 		ros::param::param<double>("max_vel", 		max_vel_, max_vel_);
 		ros::param::param<double>("max_rot", 		max_rot_, max_rot_);
+		ros::param::param<double>("expected_variance",	expected_variance_, expected_variance_);
 		
 		boost::poisson_distribution<int> pdist(1);
 		
