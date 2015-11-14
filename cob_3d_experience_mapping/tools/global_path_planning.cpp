@@ -114,6 +114,17 @@ class MainNode {
 	std::vector<Slot> slots_;
 	Eigen::VectorXd probs_;
 	
+	static void cross_correlation(Eigen::VectorXd in, const Eigen::VectorXd &p, Eigen::VectorXd &out, const size_t offset)
+	{
+		out.fill(0);
+		if(in.rows()<p.size()-off) return;
+		
+		for(size_t i=off; i<in.rows()-p.size()+off; i++) {
+			for(size_t j=0; j<p.size(); j++)
+				out(i)+=in(i+j-off)*p(j);
+		}
+	}
+	
 	void init_prob() {
 		//TODO: 
 	}
