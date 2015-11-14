@@ -106,13 +106,17 @@ class MainNode {
 	}
 	
 	struct Slot {
-		double prob_;
-		Eigen::Vector2f twist_;
+		Eigen::Vector2d twist_;
 		
-		Slot(const double v, const double r) : prob_(0), twist_(v,r) {}
+		Slot(const double v, const double r) : twist_(v,r) {}
 	};
 	
 	std::vector<Slot> slots_;
+	Eigen::VectorXd probs_;
+	
+	void init_prob() {
+		//TODO: 
+	}
 	
 	template<class Iterator>
 	void generate_path(const Iterator &begin, const Iterator &end, const float factor=1.f)
@@ -128,6 +132,9 @@ class MainNode {
 			
 			slots_.insert(slots_.end(), slots, Slot(vel/slots, rot/slots));
 		}
+		
+		probs_.setZero(slots_.size());
+		init_prob();
 	}
 	
 	void cb_action(const ratslam_ros::TopologicalActionConstPtr &msg) {
