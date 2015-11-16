@@ -118,7 +118,7 @@ class MainNode {
 	std::vector<Slot> slots_;
 	Eigen::VectorXd probs_;
 	
-	static void cross_correlation(Eigen::VectorXd in, const Eigen::VectorXd &p, Eigen::VectorXd &out, const size_t offset)
+	static void cross_correlation(Eigen::VectorXd in, const Eigen::VectorXd &p, Eigen::VectorXd &out, const size_t off)
 	{
 		out.fill(0);
 		if(in.rows()<p.size()-off) return;
@@ -143,17 +143,17 @@ class MainNode {
 		
 		offset = 3*(int)std::floor(var+0.5);
 		const size_t dist_len = (int)(dist+0.5) + 1;
-		Eigen::VectorXd dist(Eigen::VectorXd::Zero( dist_len  +  2*offset ));
+		Eigen::VectorXd dists = Eigen::VectorXd::Zero( dist_len  +  2*offset );
 		
 		//1. create triangular distribution from travelling distance (a=0, b=c=similiar distance)
 		for(size_t i=0; i<dist_len; i++)
-			dist(i+offset) = ;
+			dists(i+offset) = ;
 		
 		//2. cross-correlation with normal distribution with variance = (default odom var. + unsimiliar distance)
 		normal n(0., var);
-		for(size_t i=off; i<in.rows()-p.size()+off; i++) {
+		for(size_t i=offset; i<in.rows()-p.size()+offset; i++) {
 			for(size_t j=0; j<p.size(); j++)
-				out(i)+=in(i+j-off)*p(j);
+				out(i)+=in(i+j-offset)*p(j);
 		}
 		pdf(n, )
 		
