@@ -262,7 +262,8 @@ namespace cob_3d_experience_mapping {
 			DBG_PRINTF(" %d\n", ft_class_occurences_[ft_cl]);
 			assert(counter<=ft_class_occurences_[ft_cl]);
 					 
-			ft_imp_ -= ft_imp_*prob*counter/((no_conn+est_occ)*ft_class_occurences_[ft_cl]);
+			//ft_imp_ -= ft_imp_*prob*counter/((no_conn+est_occ)*ft_class_occurences_[ft_cl]);
+			ft_imp_ -= ft_imp_*prob/(no_conn+est_occ);
 			
 			 //ft_imp_ *= 1-prob/(no_conn+est_occ);
 			 //DBG_PRINTF("upd %d  %f\n", id(), get_feature_prob());
