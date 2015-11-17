@@ -4,6 +4,7 @@
 #include <std_msgs/Float32MultiArray.h>
 #include <boost/thread/mutex.hpp>
 #include <geometry_msgs/Twist.h>
+#include <cob_3d_visualization/simple_marker.h>
 
 #include <ratslam_ros/TopologicalAction.h>
 #include <cob_3d_experience_mapping/QueryPath.h>
@@ -226,11 +227,33 @@ public:
 		sub_action_     = nh_.subscribe("action", 1, &MainNode::cb_action, this);
 		
 		server_set_goal_.start();
+
+		cob_3d_visualization::RvizMarkerManager::get()
+			.createTopic("local_path_planning_marker")
+			.setFrameId("/base_link");
+			//.clearOld();
 	}
 	
 	double frequency() const {return fequency_;}
 	
 	void cycle() {
+	}
+			
+	void visualize() {
+		cob_3d_visualization::RvizMarkerManager::get().clear();
+		
+		{
+			cob_3d_visualization::RvizMarker scene;
+			scene.sphere(pos);
+			scene.color(1-e,e,0.);
+		}
+		{
+			cob_3d_visualization::RvizMarker scene;
+			scene.arrow(pos, pos_o, 0.03f);
+			scene.color(0,0,1,0.5);
+		}
+					
+		cob_3d_visualization::RvizMarkerManager::get().publish();
 	}
 };
 
@@ -242,6 +265,7 @@ int main(int argc, char **argv) {
 	ros::Rate r(mn.frequency());
 	while(ros::ok()) {
 		mn.cycle();
+		mn.visualize();
 		ros::spinOnce();
 	}
 	
