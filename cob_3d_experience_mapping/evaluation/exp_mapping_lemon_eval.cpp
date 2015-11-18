@@ -17,7 +17,7 @@
 
 
 #define NUM_TRANS 	2
-#define NUM_ROT		1
+#define NUM_ROT		2
 
 typedef float Scalar;
 typedef int TID;
@@ -165,13 +165,22 @@ int main(int argc, char **argv) {
 		  if(odom->header.stamp-time_last_odom_<ros::Duration(100)) {
 			  
 			  typename Transformation::TLink link;
+			  link.fill(0);
 			  link(0) = odom->twist.twist.linear.x;
-			  link(1) = odom->twist.twist.linear.y;
 			  link(2) = odom->twist.twist.angular.z;
 			  if(link(2)>M_PI)  link(2) -= 2*M_PI;
 			  if(link(2)<-M_PI) link(2) += 2*M_PI;
+		  
+			  if(link(0)<0) {
+				  link(1) = -link(0);
+				  link(0) = 0;
+			  }
+			  if(link(2)<0) {
+				  link(3) = -link(2);
+				  link(2) = 0;
+			  }
 			  
-			  Transformation action_derv(link, Eigen::Vector3f::Zero(), ctxt_.current_active_state());
+			  Transformation action_derv(link, Eigen::Vector4f::Zero(), ctxt_.current_active_state());
 			  link *= (odom->header.stamp-time_last_odom_).toSec();
 			  
 			  if(link.squaredNorm()>0) {
