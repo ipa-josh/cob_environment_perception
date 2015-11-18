@@ -127,6 +127,7 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
   common/include
+  libs
 )
 include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 link_directories(${PROJECT_SOURCE_DIR}/libs/hiberlite)

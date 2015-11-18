@@ -1,5 +1,4 @@
 #include <ros/ros.h>
-#include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Odometry.h>
 #include <std_msgs/Float32MultiArray.h>
 #include <boost/thread/mutex.hpp>
@@ -18,6 +17,9 @@
 
 #include <cob_3d_experience_mapping/SetGoalAction.h>
 #include <actionlib/server/simple_action_server.h>
+
+#include "path_probability.h"
+#include <particleplusplus/pfilter.h>
 
 typedef actionlib::SimpleActionServer<cob_3d_experience_mapping::SetGoalAction> Server_SetGoal;
 
@@ -42,6 +44,36 @@ void tokenizeV(const std::string &s, std::vector<T> &o, const char escape=':')
   }
 }
 
+
+typedef double PrecisionType;
+typedef double statetype;
+typedef double obsvtype;
+
+const PrecisionType alpha = 0.91;
+const PrecisionType beta = 1.0;
+
+std::normal_distribution<statetype> distribution(0.0, 1.0);
+
+// See https://www.zybuluo.com/zweng/note/219267 for the explanation.
+// x1 : X_n
+// x2 : X_{n-1}
+PrecisionType f(statetype x1, statetype x2) {
+  return exp(-0.5 * pow((x1 - alpha * x2), 2));
+}
+
+PrecisionType g(statetype x, obsvtype y) {
+  return 1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
+}
+
+PrecisionType q(statetype x1, statetype x2, obsvtype y) {
+  return exp(-0.5 * pow((x1 - alpha * x2), 2));
+}
+
+//std::default_random_engine generator(seed);
+statetype q_sam(statetype x, obsvtype y) {
+  return /*distribution(generator) +*/ alpha * x;
+}
+
 class MainNode {
 	
 	enum {INVALID_NODE_ID=0};
@@ -57,6 +89,9 @@ class MainNode {
 	ros::ServiceClient srv_query_path_;
 	
 	int target_id_, max_node_id_;
+	
+	//data
+	particle_plus_plus::Pfilter<statetype, obsvtype> particle_filter_;
 	
 	//action servers
 	Server_SetGoal server_set_goal_;
@@ -110,6 +145,7 @@ class MainNode {
 	struct Slot {
 		Eigen::Vector2d twist_;
 		
+		Slot() {}
 		Slot(const double v, const double r) : twist_(v,r) {}
 		
 		inline double dist(const Eigen::Vector2d &odom) const {return 1.;}
@@ -117,84 +153,23 @@ class MainNode {
 	};
 	
 	std::vector<Slot> slots_;
-	Eigen::VectorXd probs_;
-	
-	static void cross_correlation(Eigen::VectorXd in, const Eigen::VectorXd &p, Eigen::VectorXd &out, const size_t off)
-	{
-		out.fill(0);
-		if(in.rows()<p.size()-off) return;
-		
-		for(size_t i=off; i<in.rows()-p.size()+off; i++) {
-			for(size_t j=0; j<p.size(); j++)
-				out(i)+=in(i+j-off)*p(j);
-		}
-	}
-	
-	Eigen::VectorXd generate_dist(const Eigen::Vector2d &odom, const Slot &slot, size_t &offset, const double time) const {
-		using boost::math::normal;
-		
-		const double sim = slot.sim(odom);
-		const double dist = slot.dist(odom);
-		
-		assert(sim>=0 && sim<=1);
-		assert(dist>=0);
-		
-		const double scaled_def_odom_var = expected_variance_*time;
-		const double var = scaled_def_odom_var + (1-sim)*dist;
-		
-		offset = 3*(int)std::floor(var+0.5);
-		const size_t dist_len = (int)(dist+0.5) + 1;
-		Eigen::VectorXd dists = Eigen::VectorXd::Zero( dist_len  +  2*offset );
-		
-		//1. create triangular distribution from travelling distance (a=0, b=c=similiar distance)
-		for(size_t i=0; i<dist_len; i++)
-			dists(i+offset) = ;
-		
-		//2. cross-correlation with normal distribution with variance = (default odom var. + unsimiliar distance)
-		normal n(0., var);
-		for(size_t i=offset; i<in.rows()-p.size()+offset; i++) {
-			for(size_t j=0; j<p.size(); j++)
-				out(i)+=in(i+j-offset)*p(j);
-		}
-		pdf(n, )
-		
-		return dist;
-	}
 	
 	void on_odom(const Eigen::Vector2d &odom, const double time)
 	{
-		Eigen::VectorXd new_probs(Eigen::VectorXd::Zero(probs_.size()));
-		for(size_t i=0; i<slots_.size(); i++) {
-			size_t off = 0;
-			const Eigen::VectorXd p = generate_dist(odom, slots_[i], off, time);
-			
-			for(size_t j=(i>=off:0?off-i); j<(i+p.size()-off<new_probs.rows()?p.size():new_probs.rows()-i+off); j++)
-				new_probs(i)+=probs_(i+j-off)*p(j);
-		}
-		probs_ = new_probs;
-	}
-	
-	void init_prob() {
-		//TODO: 
 	}
 	
 	template<class Iterator>
 	void generate_path(const Iterator &begin, const Iterator &end, const float factor=1.f)
 	{
-		slots_.clear();
+		slots_.resize(end-begin);
 		
+		size_t pos=0;
 		for(Iterator it=begin; it!=end; it++) {
-			double vel = factor*it->linear.x;
-			double rot = factor*it->angular.z;
+			const double vel = factor*it->linear.x;
+			const  double rot = factor*it->angular.z;
 			
-			double dur = std::max(std::abs(vel)/max_vel_, std::abs(rot)/max_rot_);
-			int slots = (int)(dur/fequency_)+1;
-			
-			slots_.insert(slots_.end(), slots, Slot(vel/slots, rot/slots));
+			slots_[pos++] = Slot(vel, rot);
 		}
-		
-		probs_.setZero(slots_.size());
-		init_prob();
 	}
 	
 	void cb_action(const ratslam_ros::TopologicalActionConstPtr &msg) {
@@ -214,14 +189,13 @@ public:
 		fequency_(10.), max_vel_(0.2), max_rot_(0.2),
 		expected_variance_(0.01),
 		target_id_(INVALID_NODE_ID), max_node_id_(0),
+		particle_filter_(f, g, q, q_sam),
 		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false)
 	{
 		ros::param::param<double>("fequency", 		fequency_, fequency_);
 		ros::param::param<double>("max_vel", 		max_vel_, max_vel_);
 		ros::param::param<double>("max_rot", 		max_rot_, max_rot_);
 		ros::param::param<double>("expected_variance",	expected_variance_, expected_variance_);
-		
-		boost::poisson_distribution<int> pdist(1);
 		
 		srv_query_path_ = nh_.serviceClient<cob_3d_experience_mapping::QueryPath>("query_path");
 		sub_action_     = nh_.subscribe("action", 1, &MainNode::cb_action, this);
@@ -242,15 +216,15 @@ public:
 	void visualize() {
 		cob_3d_visualization::RvizMarkerManager::get().clear();
 		
+		for(size_t i=0; i<slots_.size(); i++)
 		{
-			cob_3d_visualization::RvizMarker scene;
+			/*cob_3d_visualization::RvizMarker scene;
 			scene.sphere(pos);
 			scene.color(1-e,e,0.);
-		}
-		{
+			
 			cob_3d_visualization::RvizMarker scene;
 			scene.arrow(pos, pos_o, 0.03f);
-			scene.color(0,0,1,0.5);
+			scene.color(0,0,1,0.5);*/
 		}
 					
 		cob_3d_visualization::RvizMarkerManager::get().publish();
