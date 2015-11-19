@@ -118,7 +118,8 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 
 	typename TState::TEnergy dev_increment = ctxt.add_odom(odom.get_data(), odom_derv.get_data());
 	if(ctxt.virtual_state() && ctxt.virtual_transistion()) {		
-		ctxt.virtual_state()->set_dist_trv( ctxt.virtual_state()->dist_trv() - dev_increment/ctxt.normalize(odom.get_data()).norm() - 0.45f*(1-ctxt.ft_current_slot_similiarity()) );
+		//ctxt.virtual_state()->set_dist_trv( ctxt.virtual_state()->dist_trv() - dev_increment/ctxt.normalize(odom.get_data()).norm() - 0.45f*(1-ctxt.ft_current_slot_similiarity()) );
+		ctxt.virtual_state()->set_dist_trv( ctxt.virtual_state()->dist_trv() - dev_increment - 0.45f*(1-ctxt.ft_current_slot_similiarity()) );
 		//dev_increment = ctxt.normalize(odom.get_data()).norm();
 		ctxt.virtual_state()->dist_dev() +=   dev_increment;
 		
@@ -419,7 +420,14 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 	
 	//step 1: set min. dist.
 	for(TIter it=begin; it!=end; it++) {
-		if((*it)->dist_trv_var()>=0.8f || (/*!(*it)->seen()&&*/(*it)->dist_trv()>(*it)->dist_trv_var()) )
+		typename TState::TEnergy border = 1;
+		if((*it)->hops()<=4)
+			border = 1-0.7f*(*it)->hops()/4.f;
+		else
+			border = 0.3f+0.4f*std::min(((*it)->hops()-4),4)/4.f;
+		if((*it)->dist_trv_var()>=border || (/*!(*it)->seen()&&*/(*it)->dist_trv()>(*it)->dist_trv_var()) )
+		//if((*it)->dist_trv_var()>=(0.3f+0.7f*std::min(4, std::abs((*it)->hops()-4))/4.f) || (/*!(*it)->seen()&&*/(*it)->dist_trv()>(*it)->dist_trv_var()) )
+		//if((*it)->dist_trv_var()>=(1-0.7f*std::min(4, (*it)->hops())/4.f) || (/*!(*it)->seen()&&*/(*it)->dist_trv()>(*it)->dist_trv_var()) )
 			continue;
 			
 		typename TState::TEnergy dh_max = 0;

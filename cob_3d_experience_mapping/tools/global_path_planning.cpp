@@ -44,34 +44,61 @@ void tokenizeV(const std::string &s, std::vector<T> &o, const char escape=':')
   }
 }
 
+	
+struct Slot {
+	Eigen::Vector2d twist_;
+	
+	Slot() {}
+	Slot(const double v, const double r) : twist_(v,r) {}
+	
+};
+
+namespace Particles {
+	typedef std::deque<Slot> TQueue;
+	typedef TQueue::iterator TPos;
+	
+	struct State {
+		Eigen::Vector2d twist_;
+		TPos pos_;
+		
+		State() {}
+		State(const TPos &pos) : pos_(pos) {}
+		
+		double relative_position() const;
+	};
+	
+	struct Observation {
+		double prob(Eigen::Vector2d twist) const;
+	};
+}
 
 typedef double PrecisionType;
-typedef double statetype;
+typedef Particles::State statetype;
 typedef double obsvtype;
 
 const PrecisionType alpha = 0.91;
 const PrecisionType beta = 1.0;
 
-std::normal_distribution<statetype> distribution(0.0, 1.0);
+//std::normal_distribution<statetype> distribution(0.0, 1.0);
 
 // See https://www.zybuluo.com/zweng/note/219267 for the explanation.
 // x1 : X_n
 // x2 : X_{n-1}
 PrecisionType f(statetype x1, statetype x2) {
-  return exp(-0.5 * pow((x1 - alpha * x2), 2));
+  return x1.relative_position()>=x2.relative_position()?1:0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
 }
 
 PrecisionType g(statetype x, obsvtype y) {
-  return 1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
+  return y.prob(x.twist_);//1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
 }
 
 PrecisionType q(statetype x1, statetype x2, obsvtype y) {
-  return exp(-0.5 * pow((x1 - alpha * x2), 2));
+  return 0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
 }
 
 //std::default_random_engine generator(seed);
 statetype q_sam(statetype x, obsvtype y) {
-  return /*distribution(generator) +*/ alpha * x;
+  return statetype();///*distribution(generator) +*/ alpha * x;
 }
 
 class MainNode {
@@ -83,6 +110,7 @@ class MainNode {
 	double fequency_;
 	double max_vel_, max_rot_;
 	double expected_variance_;
+	int num_particles_;
 	
 	ros::NodeHandle nh_;
 	ros::Subscriber sub_action_;
@@ -134,25 +162,20 @@ class MainNode {
 			return false;
 		}
 		
-		if(srv.response.invert)
+		if(srv.response.invert) {
 			generate_path(srv.response.actions.rbegin(), srv.response.actions.rend(), -1);
+			slots_.insert(slots_.begin(), Slot(0, M_PI));
+		}
 		else
 			generate_path(srv.response.actions.begin(), srv.response.actions.end(), 1);
+			
+		//init. particle filter
+		particle_filter_.initialize(num_particles_, Particles::State(slots_.begin()));
 		
 		return true;
 	}
 	
-	struct Slot {
-		Eigen::Vector2d twist_;
-		
-		Slot() {}
-		Slot(const double v, const double r) : twist_(v,r) {}
-		
-		inline double dist(const Eigen::Vector2d &odom) const {return 1.;}
-		inline double sim(const Eigen::Vector2d &odom) const {return 1.;}
-	};
-	
-	std::vector<Slot> slots_;
+	std::deque<Slot> slots_;
 	
 	void on_odom(const Eigen::Vector2d &odom, const double time)
 	{
@@ -188,6 +211,7 @@ public:
 	MainNode() :
 		fequency_(10.), max_vel_(0.2), max_rot_(0.2),
 		expected_variance_(0.01),
+		num_particles_(100),
 		target_id_(INVALID_NODE_ID), max_node_id_(0),
 		particle_filter_(f, g, q, q_sam),
 		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false)
@@ -196,6 +220,7 @@ public:
 		ros::param::param<double>("max_vel", 		max_vel_, max_vel_);
 		ros::param::param<double>("max_rot", 		max_rot_, max_rot_);
 		ros::param::param<double>("expected_variance",	expected_variance_, expected_variance_);
+		ros::param::param<int>   ("num_particles",	num_particles_, num_particles_);
 		
 		srv_query_path_ = nh_.serviceClient<cob_3d_experience_mapping::QueryPath>("query_path");
 		sub_action_     = nh_.subscribe("action", 1, &MainNode::cb_action, this);

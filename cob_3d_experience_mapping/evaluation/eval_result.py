@@ -26,6 +26,8 @@ with open(sys.argv[1], 'rb') as csvfile:
         c=0
         if int(row[1])==1: c=1
         corr+=c
+
+        i = int(row[2])
         
         x1 = float(row[3])
         y1 = float(row[4])
@@ -33,11 +35,9 @@ with open(sys.argv[1], 'rb') as csvfile:
         y2 = float(row[7])
         dist = (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2)
         c2=0
-        if dist<=0.25: #0.5m
+        if dist<=1. or i==biggest_id: #3m
 			c2=1
         corr2+=c2
-
-        i = int(row[2])
 
         if i<=biggest_id and i!=last_id:
             reloc+=1

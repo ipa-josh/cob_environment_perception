@@ -203,11 +203,18 @@ namespace cob_3d_experience_mapping {
 				//rel = er.cwiseMax(TLink::Zero()).sum();
 				
 				//er-= dev1*tmp2.norm()/tmp1.norm();
-				//er-= dev1;//*tmp2.norm();
+				er-= dev1;//*tmp2.norm();
 				//er -= general_deviation.cwiseProduct(thr.cwiseInverse());
 				
 				//er-= tmp2.cwiseAbs()*0.1f;
 				er = er.cwiseMax(TLink::Zero());
+				
+				/*if( (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum()
+						>
+					(er-deviation_.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum() )
+					er = (er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero());
+				else
+					er = (er-deviation_.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero());*/
 				
 				//dev = relation_factor*(std::pow(1/relation_factor, er.norm()/dev1.norm())-1);
 				//dev = relation_factor*(std::exp(er.norm()/dev1.norm())-1);

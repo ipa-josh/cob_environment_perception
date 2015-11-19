@@ -350,8 +350,8 @@ namespace cob_3d_experience_mapping {
 			DBG_PRINTF("action_sum_:          %f %f %f\n", action_sum_(0), action_sum_(1), action_sum_(2));
 			DBG_PRINTF("action_num_:          %f %f %f\n", action_num_(0), action_num_(1), action_num_(2));
 			DBG_PRINTF("running_dist:         %f\n", running_dist);
-			DBG_PRINTF("normalization_factor: %f %f %f\n", normalization_factor()(0), normalization_factor()(1), normalization_factor()(2));
-			DBG_PRINTF("deviation_sum:        %f %f %f\n", deviation_sum()(0), deviation_sum()(1), deviation_sum()(2));
+			DBG_PRINTF("normalization_factor: %f %f %f %f\n", normalization_factor()(0), normalization_factor()(1), normalization_factor()(2), normalization_factor()(3));
+			DBG_PRINTF("deviation_sum:        %f %f %f %f\n", deviation_sum()(0), deviation_sum()(1), deviation_sum()(2), deviation_sum()(3));
 			if(ft_slots_.size()>0) DBG_PRINTF("ft_current_slot:      %f\n", ft_current_slot_similiarity());
 			
 			if(virtual_transistion()) {

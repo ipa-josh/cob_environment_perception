@@ -53,10 +53,10 @@ class Pfilter {
     resampler_();
     return accumulate(xi1_.begin(), xi1_.end(), 0.0) / particlenum_;
   }
-  void initialize(int pn) {
+  void initialize(int pn, const StateType &def) {
     particlenum_ = pn;
-    xi1_.assign(particlenum_, 0);
-    xi2_.assign(particlenum_, 0);
+    xi1_.assign(particlenum_, def);
+    xi2_.assign(particlenum_, def);
     wi_.assign(particlenum_, 0);
   }
   ///< initialize wi_th the number of particles we want to use
