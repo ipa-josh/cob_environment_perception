@@ -8,7 +8,7 @@ struct PathProbability {
 	std::vector<double> possible_paths;
 };
 
-PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const double max_phi_speed, const size_t path_resolution, const double vel, double &within_prob, const double fact_right = 0.7, const double fact_left = 0.75, const double thr = 10.) {
+PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const double max_phi_speed, const size_t path_resolution, const double max_vel, double &within_prob, const double fact_right = 0.7, const double fact_left = 0.75, const double thr = 10.) {
 	PathProbability pp;
 	
 	//init.
@@ -39,7 +39,7 @@ PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const
 			else
 				printf("%c", o>thr?'x':' ');
 			
-			const double phi1 = std::atan2(ry*vel,rx);
+			const double phi1 = std::atan2(ry*max_vel,rx);
 			//printf(" %f ", phi1);
 			const size_t ind = (size_t)(phi1/pp.phi_res + pp.possible_paths.size()/2);
 			if(ind<0 || ind>=pp.possible_paths.size()) continue;

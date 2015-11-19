@@ -58,11 +58,11 @@ namespace Particles {
 	typedef TQueue::iterator TPos;
 	
 	struct State {
-		Eigen::Vector2d twist_;
-		TPos pos_;
+		double pos_rel_;
+		TPos pos_it_;
 		
-		State() {}
-		State(const TPos &pos) : pos_(pos) {}
+		State() : pos_rel_(0) {}
+		State(const TPos &pos) : pos_rel_(0), pos_it_(pos) {}
 		
 		double relative_position() const;
 	};
@@ -81,27 +81,30 @@ const PrecisionType beta = 1.0;
 
 //std::normal_distribution<statetype> distribution(0.0, 1.0);
 
-// See https://www.zybuluo.com/zweng/note/219267 for the explanation.
-// x1 : X_n
-// x2 : X_{n-1}
-PrecisionType f(statetype x1, statetype x2) {
-  return x1.relative_position()>=x2.relative_position()?1:0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
-}
-
-PrecisionType g(statetype x, obsvtype y) {
-  return y.prob(x.twist_);//1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
-}
-
-PrecisionType q(statetype x1, statetype x2, obsvtype y) {
-  return 0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
-}
-
-//std::default_random_engine generator(seed);
-statetype q_sam(statetype x, obsvtype y) {
-  return statetype();///*distribution(generator) +*/ alpha * x;
-}
 
 class MainNode {
+	
+	//particle filter
+	// See https://www.zybuluo.com/zweng/note/219267 for the explanation.
+	// x1 : X_n
+	// x2 : X_{n-1}
+	PrecisionType state_fn(const statetype &x1, const statetype &x2) {
+		//last_odom_
+	  return 0;//x1.relative_position()>=x2.relative_position()?1:0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
+	}
+
+	PrecisionType observe_fn(const statetype &x, const obsvtype &y) {
+	  return 0;//y.prob(x.twist_);//1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
+	}
+
+	PrecisionType proposal_fn(const statetype &x1, const statetype &x2, const obsvtype &y) {
+	  return 0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
+	}
+
+	//std::default_random_engine generator(seed);
+	statetype sampling_fn(const statetype &x, const obsvtype &y) {
+	  return statetype();///*distribution(generator) +*/ alpha * x;
+	}
 	
 	enum {INVALID_NODE_ID=0};
 	
@@ -119,7 +122,7 @@ class MainNode {
 	int target_id_, max_node_id_;
 	
 	//data
-	particle_plus_plus::Pfilter<statetype, obsvtype> particle_filter_;
+	particle_plus_plus::Pfilter<MainNode, statetype, obsvtype> particle_filter_;
 	
 	//action servers
 	Server_SetGoal server_set_goal_;
@@ -176,9 +179,12 @@ class MainNode {
 	}
 	
 	std::deque<Slot> slots_;
+	Eigen::Vector2d last_odom_;
 	
 	void on_odom(const Eigen::Vector2d &odom, const double time)
 	{
+		last_odom_ = odom;
+		particle_filter_(Particles::Observation());
 	}
 	
 	template<class Iterator>
@@ -213,7 +219,7 @@ public:
 		expected_variance_(0.01),
 		num_particles_(100),
 		target_id_(INVALID_NODE_ID), max_node_id_(0),
-		particle_filter_(f, g, q, q_sam),
+		particle_filter_(this),
 		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false)
 	{
 		ros::param::param<double>("fequency", 		fequency_, fequency_);

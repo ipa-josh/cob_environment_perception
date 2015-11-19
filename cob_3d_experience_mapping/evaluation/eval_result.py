@@ -15,6 +15,7 @@ with open(sys.argv[1], 'rb') as csvfile:
     old=0
     corr_old=0
     corr_old2=0
+    num_diff_states=0
 
     biggest_id = 1
     last_id = 1
@@ -50,7 +51,9 @@ with open(sys.argv[1], 'rb') as csvfile:
             corr_old2+=c2
 
         last_id = i
-        biggest_id = max(biggest_id, i)
+        if biggest_id<i:
+			biggest_id = i
+			num_diff_states += 1
 
 	file_size = os.path.getsize(sys.argv[1][:-3]+"map")
-    print ';'.join([str(time/num), str(corr/float(num)), str(reloc), str(corr_reloc), str(num), str(corr2/float(num)), str(corr_reloc2), str(file_size), str(old), str(corr_old), str(corr_old2)])
+    print ';'.join([str(time/num), str(corr/float(num)), str(reloc), str(corr_reloc), str(num), str(corr2/float(num)), str(corr_reloc2), str(file_size), str(old), str(corr_old), str(corr_old2), str(num_diff_states)])

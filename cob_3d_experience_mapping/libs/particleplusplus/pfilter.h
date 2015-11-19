@@ -24,7 +24,7 @@
 
 namespace particle_plus_plus {
 
-template <class StateType, class ObsvType, class PrecisionType = double>
+template <class Context, class StateType, class ObsvType, class PrecisionType = double>
 class Pfilter {
  public:
   /// hide these functions
@@ -33,20 +33,14 @@ class Pfilter {
   Pfilter &operator=(const Pfilter &other) = delete;
   virtual ~Pfilter() = default;
 
-  Pfilter(PrecisionType (*fptr)(StateType, StateType),
-          PrecisionType (*gptr)(StateType, ObsvType),
-          PrecisionType (*qptr)(StateType, StateType, ObsvType),
-          StateType (*q_sam_ptr)(StateType, ObsvType))
-      : state_fn_(fptr),
-        observe_fn_(gptr),
-        proposal_fn_(qptr),
-        sampler_(q_sam_ptr),
+  Pfilter(Context *ctxt)
+      : ctxt_(ctxt),
         resampler_(wi_, xi2_, &xi1_),
         particlenum_(0) {}  ///< declaration of constructor
 
   StateType iterate(ObsvType observe_input) {
     transform(xi1_.begin(), xi1_.end(), xi2_.begin(),
-              std::bind(sampler_, std::placeholders::_1, observe_input));
+              std::bind(&Context::sampling_fn, ctxt_, std::placeholders::_2, observe_input));
     transform(xi2_.begin(), xi2_.end(), xi1_.begin(), wi_.begin(),
               std::bind(&Pfilter::ComposeFn, this, std::placeholders::_1,
                         std::placeholders::_2, observe_input));
@@ -64,19 +58,15 @@ class Pfilter {
  private:
   PrecisionType ComposeFn(const StateType a, const StateType b,
                           const ObsvType c) const {
-    return state_fn_(a, b) * observe_fn_(a, c) / proposal_fn_(a, b, c);
+    return ctxt_->state_fn(a, b) * ctxt_->observe_fn(a, c) / ctxt_->proposal_fn(a, b, c);
   }
 
+  Context *ctxt_;
+  
   std::vector<StateType> xi1_;     ///< particles
   std::vector<StateType> xi2_;     ///< particles
   std::vector<PrecisionType> wi_;  ///< weights of particles
 
-  StateFn<StateType> state_fn_;                ///< pdf for state move
-  ObserveFn<StateType, ObsvType> observe_fn_;  ///< pdf for observation function
-  Proposal<StateType, ObsvType>
-      proposal_fn_;  ///< pdf of the proposal distribution
-  Sampler<StateType, ObsvType>
-      sampler_;                     ///< sampler of the proposal distribution
   Resampler<StateType> resampler_;  ///< resampler
 
   int particlenum_;  ///< number of particles
