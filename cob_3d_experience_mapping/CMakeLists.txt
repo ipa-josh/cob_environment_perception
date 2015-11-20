@@ -242,7 +242,11 @@ target_link_libraries(scan2feature
 
 
 catkin_add_gtest(unit_tests src/unit_tests.cpp)
+catkin_add_gtest(unit_tests_path tools/path_gtest.cpp)
 
 target_link_libraries(unit_tests
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(unit_tests_path
   ${catkin_LIBRARIES}
 )

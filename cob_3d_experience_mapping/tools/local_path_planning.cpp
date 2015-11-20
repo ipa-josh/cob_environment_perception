@@ -118,8 +118,8 @@ public:
 		}
 		
 		if(ind<pp.possible_paths.size()) {
-			action.angular.z = ((int)ind-(int)pp.possible_paths.size()/2)*pp.phi_res;
-			if(within_prob<1) action.linear.x  = vel;
+			action.angular.z = pp.angular(ind);
+			if(within_prob<1) action.linear.x  = pp.velocity(ind);
 			else if(!action.angular.z) action.angular.z = low<high?max_phi_speed_/2 : -max_phi_speed_/2;
 		}
 		else {
@@ -147,7 +147,7 @@ public:
 			
 			PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, msg->twist.twist.linear.x, fact_right_, fact_left_, occ_thr_);
  
-			const size_t org_ind = (size_t)(msg->twist.twist.angular.z/pp.phi_res + pp.possible_paths.size()/2);
+			const size_t org_ind = pp(msg->twist.twist.linear.x, msg->twist.twist.angular.z);
 			if(org_ind<0 || org_ind>=pp.possible_paths.size()) {
 				ROS_ERROR("desired rotation speed is not possible, perhaps wrong configuration?");
 				return;
@@ -166,7 +166,8 @@ public:
 			while(ind<=org_ind && ind>0          && pp.possible_paths[ind]>pp.possible_paths[ind-1]+(org_ind-ind)*(1-fact_left_) )
 				--ind;
 			
-			action.angular.z = ((int)ind-(int)pp.possible_paths.size()/2)*pp.phi_res;
+			action.angular.z = pp.angular(ind);
+			action.linear.x  = pp.velocity(ind);
 		}
 		
 		pub_odom_.publish(action);

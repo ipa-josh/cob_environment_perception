@@ -68,6 +68,13 @@ namespace Particles {
 	};
 	
 	struct Observation {
+		PathProbability prob_;
+		double within_prob_;
+		
+		Observation(const nav_msgs::OccupancyGrid &grid) :
+			prob_(generatePossiblePaths(grid, 0.5, 32, 0.5, within_prob_))
+		{}
+		
 		double prob(Eigen::Vector2d twist) const;
 	};
 }
@@ -180,11 +187,13 @@ class MainNode {
 	
 	std::deque<Slot> slots_;
 	Eigen::Vector2d last_odom_;
+	boost::shared_ptr<Particles::Observation> observation_;
 	
 	void on_odom(const Eigen::Vector2d &odom, const double time)
 	{
 		last_odom_ = odom;
-		particle_filter_(Particles::Observation());
+		if(observation_)
+			particle_filter_.iterate(*observation_);
 	}
 	
 	template<class Iterator>
