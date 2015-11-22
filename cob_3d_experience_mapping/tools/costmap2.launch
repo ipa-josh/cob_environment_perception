@@ -1,0 +1,15 @@
+<launch>
+  <param name="/use_sim_time" value="false"/>
+  
+	<arg name="debug" default="false"/>
+	<arg name="prefix" value="xterm -e gdb -ex run --args" if="$(arg debug)"/>
+	<arg name="prefix" value="" unless="$(arg debug)"/>
+
+  <node name="global_path_planning" pkg="cob_3d_experience_mapping" type="global_path_planning" output="screen" launch-prefix="$(arg prefix)">
+    <remap from="costmap" to="/costmap_node/costmap/costmap"/>
+    <remap from="action" to="/irat_red/PoseCell/TopologicalAction"/>
+    <remap from="desired_odom" to="/desired_odom"/>
+		<remap from="odom" to="/robot0/odom" />
+  </node>
+  
+</launch>
