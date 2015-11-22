@@ -29,7 +29,7 @@ class MainNode {
 public:
 
 	MainNode() :
-		max_phi_speed_(0.7), path_resolution_(25),
+		max_phi_speed_(0.7), path_resolution_(8),
 		fact_right_(0.7), fact_left_(0.75), occ_thr_(30.)
 	{
 		ros::param::param<double>("max_phi_speed", 		max_phi_speed_, max_phi_speed_);
@@ -45,7 +45,7 @@ public:
 		pub_odom_    = nh_.advertise<geometry_msgs::Twist>("action", 5);
 		pub_feature_ = nh_.advertise<std_msgs::Float32MultiArray>("feature", 5);
 		
-		timer_explore_ = nh_.createTimer(ros::Duration(1.), &MainNode::explore, this);
+		timer_explore_ = nh_.createTimer(ros::Duration(0.5), &MainNode::explore, this);
 	}
 	
 	void on_costmap_update(const nav_msgs::OccupancyGrid::ConstPtr &msg) {
@@ -86,20 +86,6 @@ public:
 		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 		double within_prob;
 		PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, vel, within_prob, fact_right_, fact_left_, occ_thr_);
-			
-		cob_3d_visualization::RvizMarkerManager::get().clear();
-		{
-			cob_3d_visualization::RvizMarker scene;
-			std::vector<std_msgs::ColorRGBA> colors(pp.possible_paths.size());
-			for(size_t i=0; i<colors.size(); i++) {
-				colors[i].r = pp.possible_paths[i];
-				colors[i].g = 1-pp.possible_paths[i];
-				colors[i].b = 0;
-				colors[i].a = 1;
-			}
-			scene.bar_radial(2*vel, Eigen::Vector3f::Zero(), colors, -max_phi_speed_, max_phi_speed_, vel);
-		}
-		cob_3d_visualization::RvizMarkerManager::get().publish();
 		
 		geometry_msgs::Twist action;
 		
@@ -109,13 +95,15 @@ public:
 			if(pp.possible_paths[i]>=1) continue;
 			
 			pp.possible_paths[i] += 0.1*std::abs((int)i-(int)pp.possible_paths.size()/2)/(double)pp.possible_paths.size();
-			pp.possible_paths[i] *= std::sin(M_PI*( i/(double)pp.possible_paths.size() + ros::Time::now().toSec()/interval ))*0.9 + 0.1;
+			pp.possible_paths[i] *= std::sin(M_PI*( i/(double)pp.possible_paths.size() + ros::Time::now().toSec()/interval ))*0.1 + 0.9;
 			if(ind>=pp.possible_paths.size() || pp.possible_paths[i]<pp.possible_paths[ind])
 				ind = i;
 				
 			if(i<pp.possible_paths.size()/2) low *= pp.possible_paths[i];
 			else if(i>pp.possible_paths.size()/2) high *= pp.possible_paths[i];
 		}
+			
+		pp.visualize(vel);
 		
 		if(ind<pp.possible_paths.size()) {
 			action.angular.z = pp.angular(ind);
@@ -138,16 +126,23 @@ public:
 		pub_odom_.publish(action);
 	}
 
-	void cb_desired_odom(const nav_msgs::Odometry::ConstPtr &msg) {
+	void cb_desired_odom(const geometry_msgs::Twist::ConstPtr &msg) {
 		ROS_INFO("cb_desired_odom");
 		
-		geometry_msgs::Twist action = msg->twist.twist;
-		if(msg->twist.twist.linear.x!=0) { //non-special case
+		if(timer_explore_.hasPending()) {
+			ROS_INFO("stopping exploration as aim was set");
+		}
+			timer_explore_.stop(); //stop exploring if we want to go somewhere
+		
+		geometry_msgs::Twist action = *msg;
+		if(action.linear.x!=0) { //non-special case
 			boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 			
-			PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, msg->twist.twist.linear.x, fact_right_, fact_left_, occ_thr_);
+			PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, action.linear.x, fact_right_, fact_left_, occ_thr_);
+			
+			pp.visualize(action.linear.x);
  
-			const size_t org_ind = pp(msg->twist.twist.linear.x, msg->twist.twist.angular.z);
+			const size_t org_ind = pp(action.linear.x, action.angular.z);
 			if(org_ind<0 || org_ind>=pp.possible_paths.size()) {
 				ROS_ERROR("desired rotation speed is not possible, perhaps wrong configuration?");
 				return;

@@ -38,14 +38,15 @@ class Pfilter {
         resampler_(wi_, xi2_, &xi1_),
         particlenum_(0) {}  ///< declaration of constructor
 
-  StateType iterate(ObsvType observe_input) {
+  typename std::vector<StateType>::iterator iterate(ObsvType observe_input) {
     transform(xi1_.begin(), xi1_.end(), xi2_.begin(),
-              std::bind(&Context::sampling_fn, ctxt_, std::placeholders::_2, observe_input));
+              std::bind(&Context::sampling_fn, ctxt_, std::placeholders::_1, observe_input));
     transform(xi2_.begin(), xi2_.end(), xi1_.begin(), wi_.begin(),
               std::bind(&Pfilter::ComposeFn, this, std::placeholders::_1,
                         std::placeholders::_2, observe_input));
     resampler_();
-    return accumulate(xi1_.begin(), xi1_.end(), 0.0) / particlenum_;
+    return xi1_.begin()+(std::max_element(wi_.begin(), wi_.end())-wi_.begin());
+    //return accumulate(xi1_.begin(), xi1_.end(), 0.0) / particlenum_;
   }
   void initialize(int pn, const StateType &def) {
     particlenum_ = pn;
@@ -53,6 +54,12 @@ class Pfilter {
     xi2_.assign(particlenum_, def);
     wi_.assign(particlenum_, 0);
   }
+  
+  inline typename std::vector<StateType>::iterator end() {return xi1_.end();}
+  inline typename std::vector<StateType>::iterator begin() {return xi1_.begin();}
+  
+  inline PrecisionType weight(const size_t ind) const {return wi_[ind];}
+  
   ///< initialize wi_th the number of particles we want to use
 
  private:

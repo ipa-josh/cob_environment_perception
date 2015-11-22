@@ -23,10 +23,15 @@ struct PathProbability {
 	}
 	
 	double &operator()(const double phi) {return possible_paths[alpha2ind(phi)];}
-	size_t operator()(const double vel, const double phi) {
-		double y = vel*std::tan(phi);
-		double v_ = max_vel/std::sqrt(1+y*y);
-		return alpha2ind(std::atan2(y, v_));
+	double &operator[](const size_t ind) {return possible_paths[ind];}
+	double operator()(const double phi) const {return possible_paths[alpha2ind(phi)];}
+	double operator[](const size_t ind) const {return possible_paths[ind];}
+	
+	size_t operator()(const double vel, double phi) const {
+		phi = phi*velocity(alpha2ind(phi))/vel;
+		if(phi<-M_PI_2) phi = -M_PI_2;
+		else if(phi>=M_PI_2) phi = M_PI_2-0.00001;
+		return alpha2ind(phi);
 	}
 	
 	double angular(const size_t ind) const {
@@ -38,7 +43,26 @@ struct PathProbability {
 		assert(ind>=0 && ind<possible_paths.size());
 		return std::cos(ind2alpha(ind))*max_vel;
 	}
+	
+	void visualize(const double vel=1) const {
+		cob_3d_visualization::RvizMarkerManager::get().clear();
+		{
+			cob_3d_visualization::RvizMarker scene;
+			std::vector<std_msgs::ColorRGBA> colors(possible_paths.size());
+			for(size_t i=0; i<colors.size(); i++) {
+				colors[i].r = possible_paths[i];
+				colors[i].g = 1-possible_paths[i];
+				colors[i].b = 0;
+				colors[i].a = 1;
+			}
+			scene.bar_radial(2*vel, Eigen::Vector3f::Zero(), colors, -M_PI_2, M_PI_2, vel);
+		}
+		cob_3d_visualization::RvizMarkerManager::get().publish();
+	}
+	
 };
+
+//#define DEBUG_OUT_PathProbability
 
 PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const double max_phi_speed, const size_t path_resolution, const double max_vel, double &within_prob, const double fact_right = 0.7, const double fact_left = 0.75, const double thr = 10.) {
 	PathProbability pp(max_phi_speed, max_vel, path_resolution);
@@ -46,7 +70,9 @@ PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const
 	//init.
 	within_prob = 0;
 	
+#ifdef DEBUG_OUT_PathProbability
 	printf("-----------------------------------------\n");
+#endif
 	
 	//inflated obstacles to path (assuming constant speed)
 	for(unsigned int x=0; x<grid.info.width; x++) {
@@ -60,21 +86,28 @@ PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const
 			
 			const double ry = (y-grid.info.height/2.)*grid.info.resolution;// - grid.info.origin.position.y;
 			//const double ry = y*grid.info.resolution;
-			if(rx<=0) continue;
+			if(rx<=0 || val<=0) continue;
 			
 			if(std::abs(rx)+std::abs(ry)<0.05) {
 				within_prob = std::max(within_prob, val);
+#ifdef DEBUG_OUT_PathProbability
 				printf("O");
 			}
 			else
 				printf("%c", o>thr?'x':' ');
+#else
+			}
+#endif
 				
 			const double vel = max_vel * rx / std::sqrt(rx*rx+ry*ry);
 			
-			const double phi1 = std::atan2(ry,rx*vel);			
+			const double phi1 = std::atan2(ry,rx*vel);	
+			//printf("%f/%f: \t%f %d\n", rx, ry, phi1, (int)pp.alpha2ind(phi1));		
 			pp(phi1) = std::max(pp(phi1), val);
 		}
+#ifdef DEBUG_OUT_PathProbability
 		printf("\n");
+#endif
 	}
 	
 	//spread distances to keep track to mid

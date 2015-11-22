@@ -1,5 +1,9 @@
 <launch>
   <param name="/use_sim_time" value="false"/>
+  
+	<arg name="debug" default="false"/>
+	<arg name="prefix" value="xterm -e gdb -ex run --args" if="$(arg debug)"/>
+	<arg name="prefix" value="" unless="$(arg debug)"/>
 
   <!-- Publishes the voxel grid to rviz for display -->
   <node pkg="costmap_2d" type="costmap_2d_markers" name="voxel_visualizer">
@@ -11,9 +15,26 @@
     <rosparam file="$(find cob_3d_experience_mapping)/tools/costmap.yaml" command="load" ns="costmap" />
   </node>
 
-  <!--node name="local_path_planning" pkg="cob_3d_experience_mapping" type="local_path_planning" >
+  <node name="local_path_planning" pkg="cob_3d_experience_mapping" type="local_path_planning" output="screen" launch-prefix="$(arg prefix)">
     <remap from="costmap" to="/costmap_node/costmap/costmap"/>
     <remap from="action" to="/robot0/cmd_vel"/>
+  </node>
+
+  <node name="scan2feature" pkg="cob_3d_experience_mapping" type="scan2feature" output="screen">
+    <remap from="scan" to="/robot0/laser_0"/>
+    <remap from="feature" to="/sim_barks/sensor_info"/>
+  </node>
+
+  <!--node name="global_path_planning" pkg="cob_3d_experience_mapping" type="global_path_planning">
+    <remap from="costmap" to="/costmap_node/costmap/costmap"/>
+    <remap from="action" to="/irat_red/PoseCell/TopologicalAction"/>
+    <remap from="desired_odom" to="/local_path_planning/desired_odom"/>
   </node-->
+  
+	 <node name="mapping" pkg="cob_3d_experience_mapping" type="cob_3d_experience_mapping_lemon_node">
+		<param name="step_mode" value="false" />
+		<remap from="/odom" to="/robot0/odom" />
+		<remap from="/PoseCell/TopologicalAction" to="/irat_red/PoseCell/TopologicalAction" />
+	 </node>
   
 </launch>

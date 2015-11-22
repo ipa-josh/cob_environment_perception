@@ -160,7 +160,7 @@ public:
 
 	  cob_3d_experience_mapping::algorithms::init<Transformation>(graph_, ctxt_, states_, trans_);
 	  
-	  srv_query_path_ = n->advertiseService("query_path", &ROS_Node::srv_query_path, this);
+	  srv_query_path_ = n->advertiseService("/query_path", &ROS_Node::srv_query_path, this);
 	  
 	  printf("init done\n");
 	  
