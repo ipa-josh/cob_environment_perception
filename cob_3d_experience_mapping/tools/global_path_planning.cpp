@@ -56,6 +56,9 @@ struct Slot {
 	Slot() {}
 	Slot(const double v, const double r) : twist_(v,r) {}
 	
+	Eigen::Affine2d getT(const double rel=1.) {
+		return Eigen::Translation2d(rel*twist_(0),0)*Eigen::Rotation2D<double>(rel*twist_(1));
+	}
 };
 
 namespace Particles {
@@ -72,13 +75,13 @@ namespace Particles {
 		double relative_position() const;
 		
 		Eigen::Affine2d pose(const TPos &begin) {
-			const Eigen::Affine2d T = Eigen::Translation2d(pos_rel_*pos_it_->twist_(0),0)*Eigen::Rotation2D<double>(pos_rel_*pos_it_->twist_(1));
+			const Eigen::Affine2d T = pos_it_->getT(pos_rel_);
 			if(begin==pos_it_) return T;
 			return pose(begin, pos_it_-1)*T;
 		}
 		
 		Eigen::Affine2d pose(const TPos &begin, const TPos &last) {
-			const Eigen::Affine2d T = Eigen::Translation2d(pos_it_->twist_(0),0)*Eigen::Rotation2D<double>(pos_it_->twist_(1));
+			const Eigen::Affine2d T = pos_it_->getT();
 			if(begin==last) return T;
 			return pose(begin, last-1)*T;
 		}
@@ -385,7 +388,19 @@ public:
 		if(best_particle_!=particle_filter_.end()) {
 			boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 			
-			Eigen::Affine2d relation = best_particle_->pose(slots_.begin());
+			Eigen::Affine2d relation = best_particle_->pose(slots_.begin()).inverse();
+			Eigen::Affine2d pos = relation;
+			
+			for(size_t i=0; i<slots_.size(); i++) {
+				Eigen::Vector3d v3_1(0,0,0), v3_2(0,0,0);
+				v3_1.head<2>() = pos.translation();
+				pos = slots_[i].getT()*pos;
+				v3_2.head<2>() = pos.translation();
+				
+				cob_3d_visualization::RvizMarker scene;
+				scene.arrow(v3_1, v3_2, 0.03f);
+				scene.color(0,0,1,0.5);
+			}
 			 
 			for(std::vector<statetype>::iterator it=particle_filter_.begin(); it!=particle_filter_.end(); it++)
 			{
@@ -398,10 +413,6 @@ public:
 				cob_3d_visualization::RvizMarker scene;
 				scene.sphere(v3);
 				scene.color(1-e,e,0.);
-				
-				/*cob_3d_visualization::RvizMarker scene;
-				scene.arrow(pos, pos_o, 0.03f);
-				scene.color(0,0,1,0.5);*/
 			}
 		}
 					
