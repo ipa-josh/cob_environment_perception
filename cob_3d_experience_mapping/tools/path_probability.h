@@ -1,6 +1,8 @@
 #pragma once
 
+#include <Eigen/Core>
 #include <nav_msgs/OccupancyGrid.h>
+#include <cob_3d_visualization/simple_marker.h>
 
 
 struct PathProbability {
@@ -46,18 +48,20 @@ struct PathProbability {
 	
 	void visualize(const double vel=1) const {
 		cob_3d_visualization::RvizMarkerManager::get().clear();
-		{
-			cob_3d_visualization::RvizMarker scene;
-			std::vector<std_msgs::ColorRGBA> colors(possible_paths.size());
-			for(size_t i=0; i<colors.size(); i++) {
-				colors[i].r = possible_paths[i];
-				colors[i].g = 1-possible_paths[i];
-				colors[i].b = 0;
-				colors[i].a = 1;
-			}
-			scene.bar_radial(2*vel, Eigen::Vector3f::Zero(), colors, -M_PI_2, M_PI_2, vel);
-		}
+		visualize_partly(vel);
 		cob_3d_visualization::RvizMarkerManager::get().publish();
+	}
+	
+	void visualize_partly(const double vel=1) const {
+		cob_3d_visualization::RvizMarker scene;
+		std::vector<std_msgs::ColorRGBA> colors(possible_paths.size());
+		for(size_t i=0; i<colors.size(); i++) {
+			colors[i].r = possible_paths[i];
+			colors[i].g = 1-possible_paths[i];
+			colors[i].b = 0;
+			colors[i].a = 1;
+		}
+		scene.bar_radial(2*vel, Eigen::Vector3f::Zero(), colors, -M_PI_2, M_PI_2, vel);
 	}
 	
 };

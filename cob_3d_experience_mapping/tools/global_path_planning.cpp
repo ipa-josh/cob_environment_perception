@@ -3,12 +3,10 @@
 #include <std_msgs/Float32MultiArray.h>
 #include <boost/thread/mutex.hpp>
 #include <geometry_msgs/Twist.h>
-#include <cob_3d_visualization/simple_marker.h>
 
 #include <ratslam_ros/TopologicalAction.h>
 #include <cob_3d_experience_mapping/QueryPath.h>
 
-#include <Eigen/Core>
 #include <Eigen/Geometry>
 
 #include <boost/tokenizer.hpp>
@@ -131,7 +129,6 @@ namespace Particles {
 		Observation(const nav_msgs::OccupancyGrid &grid) :
 			prob_(generatePossiblePaths(grid, 0.5, 8, 0.5, within_prob_))
 		{
-			prob_.visualize(0.5);
 		}
 		
 		double prob(Eigen::Vector2d twist) const;
@@ -247,6 +244,7 @@ private:
 			ROS_ERROR("failed to call query path service");
 			return false;
 		}
+		//srv.response = test_generate_random_path();
 		
 		if(srv.response.invert) {
 			generate_path(srv.response.actions.rbegin(), srv.response.actions.rend(), -1);
@@ -327,6 +325,17 @@ public:
 		on_odom( Eigen::Vector2d((rand()%1000)/1000., (rand()%1000-500)/1000.), 0.5 );
 		
 		ROS_INFO("test passed");
+	}
+	
+	cob_3d_experience_mapping::QueryPath::Response test_generate_random_path() {
+		cob_3d_experience_mapping::QueryPath::Response r;
+		r.invert = true;
+		r.actions.resize(10);
+		for(size_t i=0; i<r.actions.size(); i++) {
+			r.actions[i].linear.x = (rand()%1001)/1000.*0.5;
+			r.actions[i].angular.z = (rand()%1001)/1000.-0.5;
+		}
+		return r;
 	}
 
 	MainNode() :
@@ -415,6 +424,9 @@ public:
 				scene.color(1-e,e,0.);
 			}
 		}
+		
+		if(observation_)
+			observation_->prob_.visualize_partly(0.5);
 					
 		cob_3d_visualization::RvizMarkerManager::get().publish();
 	}

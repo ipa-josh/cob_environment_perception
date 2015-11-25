@@ -3,8 +3,6 @@
 #include <std_msgs/Float32MultiArray.h>
 #include <boost/thread/mutex.hpp>
 #include <geometry_msgs/Twist.h>
-#include <Eigen/Core>
-#include <cob_3d_visualization/simple_marker.h>
 #include "path_probability.h"
 
 class MainNode {
