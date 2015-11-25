@@ -1,9 +1,18 @@
 #pragma once
 
+#include <deque>
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <nav_msgs/OccupancyGrid.h>
+#include <geometry_msgs/Twist.h>
 #include <cob_3d_visualization/simple_marker.h>
 
+#include <boost/random.hpp>
+#include <boost/random/triangle_distribution.hpp>
+#include <boost/math/distributions/normal.hpp> // for normal_distribution
+#include <boost/math/distributions/triangular.hpp>
+#include <chrono>
+#include <particleplusplus/pfilter.h>
 
 struct PathProbability {
 	double max_phi_speed, max_vel;
@@ -122,3 +131,146 @@ PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const
 		
 	return pp;
 }
+
+struct Slot {
+	Eigen::Vector2d twist_;
+	
+	Slot() {}
+	Slot(const double v, const double r) : twist_(v,r) {}
+	
+	Eigen::Affine2d getT(const double rel=1.) {
+		return Eigen::Rotation2D<double>(rel*twist_(1))*Eigen::Translation2d(rel*twist_(0),0);
+	}
+};
+
+namespace Particles {
+	typedef std::deque<Slot> TQueue;
+	typedef TQueue::iterator TPos;
+	
+	struct State {
+		double pos_rel_;
+		TPos pos_it_;
+		
+		State() = delete;// : pos_rel_(0) {}
+		State(const TPos &pos) : pos_rel_(0), pos_it_(pos) {}
+		
+		double relative_position() const;
+		
+		Eigen::Affine2d pose(const TPos &begin) {
+			const Eigen::Affine2d T = pos_it_->getT(pos_rel_);
+			if(begin==pos_it_) return T;
+			return pose(begin, pos_it_-1)*T;
+		}
+		
+		Eigen::Affine2d pose(const TPos &begin, const TPos &last) {
+			const Eigen::Affine2d T = pos_it_->getT();
+			if(begin==last) return T;
+			return pose(begin, last-1)*T;
+		}
+		
+		Eigen::Vector2d _op_min(const TPos &it) const {
+			if(it==pos_it_)
+				return pos_rel_*pos_it_->twist_;
+			return pos_it_->twist_+_op_min(it+1);
+		}
+		
+		Eigen::Vector2d operator-(const State &o) const {
+			if(o.pos_it_>pos_it_)
+				return Eigen::Vector2d(0,0);
+			return _op_min(o.pos_it_)-o.pos_rel_*o.pos_it_->twist_;
+		}
+		
+		State moved(double length, TPos end) const {
+			State r=*this;
+			length += r.pos_rel_*r.pos_it_->twist_.norm();
+			
+			while(length*length>=r.pos_it_->twist_.squaredNorm())
+			{
+				if(r.pos_it_+1==end) {
+					r.pos_rel_ = 1;
+					return r;
+				}
+				length -= r.pos_it_->twist_.norm();
+				r.pos_it_++;
+			}
+			r.pos_rel_ = length/r.pos_it_->twist_.norm();
+			//std::cout<<"moved: "<<length<<"/"<<r.pos_it_->twist_.norm()<<std::endl;
+			return r;
+		}
+			
+		geometry_msgs::Twist action(double freq=1) const {
+			geometry_msgs::Twist action;
+			action.linear.x  = pos_it_->twist_(0)/freq;
+			action.angular.z = pos_it_->twist_(1)/freq;
+			return action;
+		}
+	};
+	
+	struct Observation {
+		PathProbability prob_;
+		double within_prob_;
+		
+		Observation(const nav_msgs::OccupancyGrid &grid) :
+			prob_(generatePossiblePaths(grid, 0.5, 8, 0.5, within_prob_))
+		{
+		}
+		
+		Observation(const PathProbability &prob) :
+			prob_(prob), within_prob_(0)
+		{
+		}
+		
+		double prob(Eigen::Vector2d twist) const;
+	};
+}
+
+class PathObserver {
+public:
+	typedef double PrecisionType;
+	typedef Particles::State statetype;
+	typedef Particles::Observation obsvtype;
+
+protected:
+	
+	std::deque<Slot> slots_;
+	Eigen::Vector2d last_odom_;
+	double last_time_delta_, last_time_ts_;
+	boost::shared_ptr<Particles::Observation> observation_;
+	std::vector<statetype>::iterator best_particle_;
+	
+	particle_plus_plus::Pfilter<PathObserver, statetype, obsvtype> particle_filter_;
+	
+	PathObserver() : 
+		particle_filter_(this), best_particle_(particle_filter_.end())
+	{}
+	
+public:
+
+	//particle filter
+	// See https://www.zybuluo.com/zweng/note/219267 for the explanation.
+	// x1 : X_n
+	// x2 : X_{n-1}
+	PrecisionType state_fn(const statetype &x1, const statetype &x2) {
+	  return std::exp( -((x1-x2)-last_odom_).norm() );//x1.relative_position()>=x2.relative_position()?1:0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
+	}
+
+	PrecisionType observe_fn(const statetype &x, const obsvtype &y) {
+	  return 1.-0.9*y.prob_[y.prob_(last_odom_(0), last_odom_(1))];//y.prob(x.twist_);//1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
+	}
+
+	PrecisionType proposal_fn(const statetype &x1, const statetype &x2, const obsvtype &y) {
+	  return 1;//exp(-0.5 * pow((x1 - alpha * x2), 2));
+	}
+
+	boost::mt19937 rng_;
+	statetype sampling_fn(const statetype &x, const obsvtype &y) {
+	  boost::normal_distribution<double> distribution_normal(0., 0.001);	//TODO: check
+	  boost::triangle_distribution<double> distribution_triangular(0.,1.,1.1);
+	  
+      boost::variate_generator<boost::mt19937&, boost::normal_distribution<double> > var_nor(rng_, distribution_normal);
+      boost::variate_generator<boost::mt19937&, boost::triangle_distribution<double> > var_tri(rng_, distribution_triangular);
+	  
+	  return x.moved( (var_tri() + var_nor()*last_time_delta_) * last_odom_.norm(), slots_.end() );///*distribution(generator) +*/ alpha * x;
+	}
+
+};
