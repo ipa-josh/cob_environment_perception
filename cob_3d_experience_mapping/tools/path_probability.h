@@ -204,7 +204,7 @@ namespace Particles {
 			
 		geometry_msgs::Twist action(double freq=1) const {
 			geometry_msgs::Twist action;
-			action.linear.x  = pos_it_->twist_(0)/freq;
+			action.linear.x  = pos_it_->twist_(0)/std::abs(freq);
 			action.angular.z = pos_it_->twist_(1)/freq;
 			return action;
 		}
@@ -244,7 +244,8 @@ protected:
 	
 	particle_plus_plus::Pfilter<PathObserver, statetype, obsvtype> particle_filter_;
 	
-	PathObserver() : 
+	PathObserver() :
+		last_time_ts_(-1),
 		particle_filter_(this), best_particle_(particle_filter_.end())
 	{}
 	

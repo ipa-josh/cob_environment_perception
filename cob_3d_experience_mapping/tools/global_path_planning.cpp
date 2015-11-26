@@ -108,6 +108,7 @@ class MainNode : public PathObserver{
 		if(srv.response.invert) {
 			generate_path(srv.response.actions.rbegin(), srv.response.actions.rend(), -1);
 			slots_.insert(slots_.begin(), Slot(0, M_PI));
+			slots_.insert(slots_.end(), Slot(0, M_PI));
 		}
 		else
 			generate_path(srv.response.actions.begin(), srv.response.actions.end(), 1);
@@ -134,7 +135,13 @@ class MainNode : public PathObserver{
 		
 		if(observation_ && target_id_!=INVALID_NODE_ID) {
 			best_particle_ = particle_filter_.iterate(*observation_);
-			pub_odom_.publish(best_particle_->action(fequency_));
+			if(best_particle_->pos_it_+1 == slots_.end() && best_particle_->pos_rel_>0.5) {
+				pub_odom_.publish(geometry_msgs::Twist());
+				target_id_=INVALID_NODE_ID;
+				observation_.reset();
+			}
+			else
+				pub_odom_.publish(best_particle_->action(fequency_));
 		}
 	}
 	
@@ -165,39 +172,12 @@ class MainNode : public PathObserver{
 	
 public:
 
-	void test() {
-		slots_.resize(10);
-		for(size_t i=0; i<slots_.size(); i++)
-			slots_[i] = Slot((rand()%1000)/1000., (rand()%1000-500)/1000.);
-			
-		particle_filter_.initialize(num_particles_, Particles::State(slots_.begin()));
-		best_particle_=particle_filter_.end();
-		
-		observation_.reset(new Particles::Observation(nav_msgs::OccupancyGrid()) );
-		
-		on_odom( Eigen::Vector2d((rand()%1000)/1000., (rand()%1000-500)/1000.), 0.5 );
-		
-		ROS_INFO("test passed");
-	}
-	
-	cob_3d_experience_mapping::QueryPath::Response test_generate_random_path() {
-		cob_3d_experience_mapping::QueryPath::Response r;
-		r.invert = true;
-		r.actions.resize(10);
-		for(size_t i=0; i<r.actions.size(); i++) {
-			r.actions[i].linear.x = (rand()%1001)/1000.*0.5;
-			r.actions[i].angular.z = (rand()%1001)/1000.-0.5;
-		}
-		return r;
-	}
-
 	MainNode() :
 		fequency_(10.), max_vel_(0.2), max_rot_(0.2),
 		expected_variance_(0.01),
 		num_particles_(1000),
 		target_id_(INVALID_NODE_ID), max_node_id_(0),
-		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false),
-		last_time_ts_(-1)
+		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false)
 	{
 		ros::param::param<double>("fequency", 		fequency_, fequency_);
 		ros::param::param<double>("max_vel", 		max_vel_, max_vel_);
@@ -218,8 +198,6 @@ public:
 			.createTopic("global_path_planning_marker")
 			.setFrameId("/base_link");
 			//.clearOld();
-			
-		//test();
 	}
 	
 	void cb_odom(const nav_msgs::Odometry::ConstPtr &msg) {
@@ -246,7 +224,7 @@ public:
 	void visualize() {
 		cob_3d_visualization::RvizMarkerManager::get().clear();
 		
-		if(best_particle_!=particle_filter_.end()) {
+		if(target_id_!=INVALID_NODE_ID && best_particle_!=particle_filter_.end()) {
 			boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 			
 			Eigen::Affine2d relation = best_particle_->pose(slots_.begin()).inverse();
@@ -264,6 +242,7 @@ public:
 			}
 			
 			std::cout<<"particle("<<particle_filter_.weight(best_particle_-particle_filter_.begin())<<"): "<<relation.translation().head<2>().transpose()<<std::endl;
+			std::cout<<"best particles: "<<(best_particle_->pos_it_-slots_.begin())<<" "<<best_particle_->pos_rel_<<"  w="<<particle_filter_.weight(best_particle_-particle_filter_.begin())<<std::endl;
 			 
 			for(std::vector<statetype>::iterator it=particle_filter_.begin(); it!=particle_filter_.end(); it++)
 			{
