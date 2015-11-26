@@ -194,7 +194,7 @@ public:
 	MainNode() :
 		fequency_(10.), max_vel_(0.2), max_rot_(0.2),
 		expected_variance_(0.01),
-		num_particles_(100),
+		num_particles_(1000),
 		target_id_(INVALID_NODE_ID), max_node_id_(0),
 		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false),
 		last_time_ts_(-1)

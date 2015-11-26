@@ -171,18 +171,22 @@ namespace Particles {
 		Eigen::Vector2d _op_min(const TPos &it) const {
 			if(it==pos_it_)
 				return pos_rel_*pos_it_->twist_;
-			return pos_it_->twist_+_op_min(it+1);
+			return it->twist_+_op_min(it+1);
 		}
 		
 		Eigen::Vector2d operator-(const State &o) const {
 			if(o.pos_it_>pos_it_)
 				return Eigen::Vector2d(0,0);
+			//std::cout<<"op- "<<_op_min(o.pos_it_).transpose()<<" - "<<(o.pos_rel_*o.pos_it_->twist_).transpose()<<std::endl;
 			return _op_min(o.pos_it_)-o.pos_rel_*o.pos_it_->twist_;
 		}
 		
 		State moved(double length, TPos end) const {
 			State r=*this;
+			
+			//std::cout<<"moved*: "<<length/pos_it_->twist_.norm()<<" ";
 			length += r.pos_rel_*r.pos_it_->twist_.norm();
+			//std::cout<<length/pos_it_->twist_.norm()<<std::endl;
 			
 			while(length*length>=r.pos_it_->twist_.squaredNorm())
 			{
@@ -194,7 +198,7 @@ namespace Particles {
 				r.pos_it_++;
 			}
 			r.pos_rel_ = length/r.pos_it_->twist_.norm();
-			//std::cout<<"moved: "<<length<<"/"<<r.pos_it_->twist_.norm()<<std::endl;
+			//std::cout<<"moved: "<<length<<"/"<<r.pos_it_->twist_.norm()<<" "<<r.pos_rel_<<std::endl;
 			return r;
 		}
 			
@@ -251,11 +255,12 @@ public:
 	// x1 : X_n
 	// x2 : X_{n-1}
 	PrecisionType state_fn(const statetype &x1, const statetype &x2) {
-	  return std::exp( -((x1-x2)-last_odom_).norm() );//x1.relative_position()>=x2.relative_position()?1:0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
+	  //std::cout<<"dist: "<<((x1-x2)-last_odom_).norm()/last_odom_.norm()<<std::endl;
+	  return std::exp( -std::pow( 5*((x1-x2)-last_odom_).norm()/last_odom_.norm(), 2) );//x1.relative_position()>=x2.relative_position()?1:0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
 	}
 
 	PrecisionType observe_fn(const statetype &x, const obsvtype &y) {
-	  return 1.-0.9*y.prob_[y.prob_(last_odom_(0), last_odom_(1))];//y.prob(x.twist_);//1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
+	  return 1.-0.5*std::pow( y.prob_[y.prob_(last_odom_(0), last_odom_(1))], 2);//y.prob(x.twist_);//1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
 	}
 
 	PrecisionType proposal_fn(const statetype &x1, const statetype &x2, const obsvtype &y) {
@@ -265,10 +270,12 @@ public:
 	boost::mt19937 rng_;
 	statetype sampling_fn(const statetype &x, const obsvtype &y) {
 	  boost::normal_distribution<double> distribution_normal(0., 0.001);	//TODO: check
-	  boost::triangle_distribution<double> distribution_triangular(0.,1.,1.1);
+	  boost::triangle_distribution<double> distribution_triangular(0.,1.,1.2);
 	  
       boost::variate_generator<boost::mt19937&, boost::normal_distribution<double> > var_nor(rng_, distribution_normal);
       boost::variate_generator<boost::mt19937&, boost::triangle_distribution<double> > var_tri(rng_, distribution_triangular);
+      
+      //std::cout<<"rand "<<(var_tri() + var_nor()*last_time_delta_)<<std::endl;
 	  
 	  return x.moved( (var_tri() + var_nor()*last_time_delta_) * last_odom_.norm(), slots_.end() );///*distribution(generator) +*/ alpha * x;
 	}

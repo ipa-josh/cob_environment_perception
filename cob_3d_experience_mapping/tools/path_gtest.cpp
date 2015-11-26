@@ -23,7 +23,10 @@ public:
 		
 		best_particle_ = particle_filter_.iterate(*observation_);
 		
-		std::cout<<"best particles: "<<(best_particle_->pos_it_-slots_.begin())<<" "<<best_particle_->pos_rel_<<std::endl;
+		//std::cout<<"\nexpect: "<<((step+1)/10)<<" "<<((step+1)%10)/10.<<std::endl;
+		//for(auto it=particle_filter_.begin(); it!=particle_filter_.end(); it++)
+		//	std::cout<<"p: "<<(it->pos_it_-slots_.begin())<<" "<<it->pos_rel_<<"\t  w="<<particle_filter_.weight(it-particle_filter_.begin())<<std::endl;
+		std::cout<<"best particles: "<<(best_particle_->pos_it_-slots_.begin())<<" "<<best_particle_->pos_rel_<<"  w="<<particle_filter_.weight(best_particle_-particle_filter_.begin())<<std::endl;
 		
 		return false;
 	}
