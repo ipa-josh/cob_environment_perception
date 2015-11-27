@@ -4,6 +4,7 @@
 #include <boost/thread/mutex.hpp>
 #include <geometry_msgs/Twist.h>
 #include "path_probability.h"
+#include <map_msgs/OccupancyGridUpdate.h>
 
 class MainNode {
 
@@ -13,11 +14,12 @@ class MainNode {
 	double fact_right_;
 	double fact_left_;
 	double occ_thr_;
+	std::string fixed_frame_;
 	
 	ros::NodeHandle nh_;	
 	nav_msgs::OccupancyGrid grid_;
 	
-	ros::Subscriber sub_req_, sub_costmap_;
+	ros::Subscriber sub_req_, sub_costmap_, sub_costmap_updates_;
 	ros::Publisher pub_odom_, pub_feature_;
 	
 	ros::Timer timer_explore_;
@@ -28,17 +30,19 @@ public:
 
 	MainNode() :
 		max_phi_speed_(0.7), path_resolution_(8),
-		fact_right_(0.7), fact_left_(0.75), occ_thr_(30.)
+		fact_right_(0.7), fact_left_(0.75), occ_thr_(30.),
+		fixed_frame_("/world")
 	{
 		ros::param::param<double>("max_phi_speed", 		max_phi_speed_, max_phi_speed_);
 		ros::param::param<double>("fact_right", 		fact_right_, fact_right_);
 		ros::param::param<double>("fact_left", 			fact_left_, fact_left_);
 		ros::param::param<double>("occ_thr", 			occ_thr_, occ_thr_);
 		ros::param::param<int>   ("path_resolution", 	path_resolution_, path_resolution_);
+		ros::param::param<std::string>("fixed_frame", 	fixed_frame_, fixed_frame_);
 		
 		//subscribe to desired odom. message (->action of robot)
 		sub_req_     = nh_.subscribe("desired_odom", 1, &MainNode::cb_desired_odom,   this);
-		sub_costmap_ = nh_.subscribe("costmap",      1, &MainNode::on_costmap_update, this);
+		sub_costmap_ = nh_.subscribe("costmap",      1, &MainNode::on_costmap, this);
 		
 		pub_odom_    = nh_.advertise<geometry_msgs::Twist>("action", 5);
 		pub_feature_ = nh_.advertise<std_msgs::Float32MultiArray>("feature", 5);
@@ -46,11 +50,26 @@ public:
 		timer_explore_ = nh_.createTimer(ros::Duration(0.5), &MainNode::explore, this);
 	}
 	
-	void on_costmap_update(const nav_msgs::OccupancyGrid::ConstPtr &msg) {
+	void on_costmap(const nav_msgs::OccupancyGrid::ConstPtr &msg) {
 		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 		grid_ = *msg;
 		
 		cob_3d_visualization::RvizMarkerManager::get().setFrameId(msg->header.frame_id);
+		
+		calc_feature();
+		
+		sub_costmap_updates_ = nh_.subscribe("costmap_updates",      1, &MainNode::on_costmap_update, this);
+	}
+	
+	void on_costmap_update(const map_msgs::OccupancyGridUpdate::ConstPtr &msg) {
+		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
+		
+		grid_.header = msg->header;
+		
+		int index = 0;
+		for(int y=msg->y; y< msg->y+msg->height; y++)
+			for(int x=msg->x; x< msg->x+msg->width; x++)
+				grid_.data[ y * grid_.info.width + x ] = msg->data[ index++ ];
 		
 		calc_feature();
 	}
@@ -60,7 +79,7 @@ public:
 		
 		//boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 		double within_prob;
-		PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, vel, within_prob, fact_right_, fact_left_, occ_thr_);
+		PathProbability pp = generatePossiblePaths(grid_, fixed_frame_, path_resolution_, vel, within_prob, fact_right_, fact_left_, occ_thr_);
 		
 		std_msgs::Float32MultiArray msg;
 		msg.layout.dim.resize(1);
@@ -83,7 +102,7 @@ public:
 		
 		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 		double within_prob;
-		PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, vel, within_prob, fact_right_, fact_left_, occ_thr_);
+		PathProbability pp = generatePossiblePaths(grid_, fixed_frame_, path_resolution_, vel, within_prob, fact_right_, fact_left_, occ_thr_);
 		
 		geometry_msgs::Twist action;
 		
@@ -136,7 +155,7 @@ public:
 		if(action.linear.x!=0) { //non-special case
 			boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 			
-			PathProbability pp = generatePossiblePaths(grid_, max_phi_speed_, path_resolution_, action.linear.x, fact_right_, fact_left_, occ_thr_);
+			PathProbability pp = generatePossiblePaths(grid_, fixed_frame_, path_resolution_, action.linear.x, fact_right_, fact_left_, occ_thr_);
 			
 			pp.visualize(action.linear.x);
  

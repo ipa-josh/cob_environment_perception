@@ -7,6 +7,7 @@
 
   <node name="global_path_planning" pkg="cob_3d_experience_mapping" type="global_path_planning" output="screen" launch-prefix="$(arg prefix)">
     <remap from="costmap" to="/costmap_node/costmap/costmap"/>
+    <remap from="costmap_updates" to="/costmap_node/costmap/costmap_updates"/>
     <remap from="action" to="/irat_red/PoseCell/TopologicalAction"/>
     <remap from="desired_odom" to="/desired_odom"/>
 		<remap from="odom" to="/robot0/odom" />

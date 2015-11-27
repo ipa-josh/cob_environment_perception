@@ -17,6 +17,7 @@
 
   <node name="local_path_planning" pkg="cob_3d_experience_mapping" type="local_path_planning" output="screen" launch-prefix="$(arg prefix)">
     <remap from="costmap" to="/costmap_node/costmap/costmap"/>
+    <remap from="costmap_updates" to="/costmap_node/costmap/costmap_updates"/>
     <remap from="action" to="/robot0/cmd_vel"/>
   </node>
 

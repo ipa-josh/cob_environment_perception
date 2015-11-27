@@ -14,12 +14,17 @@
 #include <chrono>
 #include <particleplusplus/pfilter.h>
 
-struct PathProbability {
-	double max_phi_speed, max_vel;
+#include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
+
+struct PathProbability {	
+	double max_vel;
 	std::vector<double> possible_paths;
 	
-	PathProbability(const double phi, const double vel, const size_t res) :
-	max_phi_speed(phi), max_vel(vel), possible_paths(2*res+1, 0.)
+	PathProbability() {}
+	
+	PathProbability(const double vel, const size_t res) :
+	 max_vel(vel), possible_paths(2*res+1, 0.)
 	{
 	}
 	
@@ -77,8 +82,31 @@ struct PathProbability {
 
 //#define DEBUG_OUT_PathProbability
 
-PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const double max_phi_speed, const size_t path_resolution, const double max_vel, double &within_prob, const double fact_right = 0.7, const double fact_left = 0.75, const double thr = 10.) {
-	PathProbability pp(max_phi_speed, max_vel, path_resolution);
+PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const std::string fixed_frame_id, const size_t path_resolution, const double max_vel, double &within_prob, const double fact_right = 0.7, const double fact_left = 0.75, const double thr = 10.) {
+	PathProbability pp(max_vel, path_resolution);
+	
+    Eigen::Affine2d trans2d;
+    
+	static tf::TransformListener listener_(ros::Duration(30.));
+	tf::StampedTransform transform;
+    try{
+      listener_.lookupTransform(grid.header.frame_id, ros::Time(0), //target
+                               grid.header.frame_id, grid.header.stamp, //source
+                               fixed_frame_id,
+                               transform);
+                               
+		Eigen::Affine3d T;
+		tf::transformTFToEigen(transform, T);
+		trans2d = Eigen::Translation2d(T.translation().topRows<2>()) *
+               T.linear().topLeftCorner<2,2>();
+    }
+    catch (tf::TransformException ex){
+      ROS_ERROR("%s",ex.what());
+      
+      trans2d = Eigen::Translation2d(0,0);
+    }
+    
+	std::cout<<"trans2d: "<<trans2d.translation().transpose()<<"\n"<<trans2d.rotation()<<std::endl;
 	
 	//init.
 	within_prob = 0;
@@ -90,18 +118,21 @@ PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const
 	//inflated obstacles to path (assuming constant speed)
 	for(unsigned int x=0; x<grid.info.width; x++) {
 		//const double rx = x*grid.info.resolution;
-		const double rx = (x-grid.info.width /2.)*grid.info.resolution;// - grid.info.origin.position.x;
+		Eigen::Vector2d rv;
+		rv(0) = (x-grid.info.width /2.)*grid.info.resolution;// - grid.info.origin.position.x;
 			
 		for(unsigned int y=0; y<grid.info.height; y++) {
 			int8_t o = grid.data[y*grid.info.width+x];
 			if(o<0) o=0;
 			const double val = std::min(1., o/thr);
 			
-			const double ry = (y-grid.info.height/2.)*grid.info.resolution;// - grid.info.origin.position.y;
-			//const double ry = y*grid.info.resolution;
-			if(rx<=0 || val<=0) continue;
+			rv(1) = (y-grid.info.height/2.)*grid.info.resolution;// - grid.info.origin.position.y;
+			rv = trans2d*rv;
 			
-			if(std::abs(rx)+std::abs(ry)<0.05) {
+			//const double ry = y*grid.info.resolution;
+			if(rv(0)<=0 || val<=0) continue;
+			
+			if(std::abs(rv(0))+std::abs(rv(1))<0.05) {
 				within_prob = std::max(within_prob, val);
 #ifdef DEBUG_OUT_PathProbability
 				printf("O");
@@ -112,9 +143,9 @@ PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const
 			}
 #endif
 				
-			const double vel = max_vel * rx / std::sqrt(rx*rx+ry*ry);
+			const double vel = max_vel * rv(0) / rv.norm();
 			
-			const double phi1 = std::atan2(ry,rx*vel);	
+			const double phi1 = std::atan2(rv(1),rv(0)*vel);	
 			//printf("%f/%f: \t%f %d\n", rx, ry, phi1, (int)pp.alpha2ind(phi1));		
 			pp(phi1) = std::max(pp(phi1), val);
 		}
@@ -211,17 +242,22 @@ namespace Particles {
 	};
 	
 	struct Observation {
+		nav_msgs::OccupancyGrid grid_;
 		PathProbability prob_;
 		double within_prob_;
 		
 		Observation(const nav_msgs::OccupancyGrid &grid) :
-			prob_(generatePossiblePaths(grid, 0.5, 8, 0.5, within_prob_))
+			grid_(grid)
 		{
 		}
 		
 		Observation(const PathProbability &prob) :
 			prob_(prob), within_prob_(0)
 		{
+		}
+		
+		void update(const std::string &fixed_frame) {
+			prob_ = generatePossiblePaths(grid_, fixed_frame, 8, 0.5, within_prob_);
 		}
 		
 		double prob(Eigen::Vector2d twist) const;

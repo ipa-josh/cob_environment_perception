@@ -3,6 +3,7 @@
 #include <std_msgs/Float32MultiArray.h>
 #include <boost/thread/mutex.hpp>
 
+#include <map_msgs/OccupancyGridUpdate.h>
 #include <ratslam_ros/TopologicalAction.h>
 #include <cob_3d_experience_mapping/QueryPath.h>
 
@@ -48,9 +49,11 @@ class MainNode : public PathObserver{
 	double max_vel_, max_rot_;
 	double expected_variance_;
 	int num_particles_;
+	std::string fixed_frame_;
 	
+	nav_msgs::OccupancyGrid grid_;
 	ros::NodeHandle nh_;
-	ros::Subscriber sub_action_, sub_costmap_, sub_odom_;
+	ros::Subscriber sub_action_, sub_costmap_, sub_costmap_updates_, sub_odom_;
 	ros::Publisher pub_odom_;
 	ros::ServiceClient srv_query_path_;
 	
@@ -134,6 +137,7 @@ class MainNode : public PathObserver{
 		std::cout<<"odom: "<<last_odom_.transpose()<<std::endl;
 		
 		if(observation_ && target_id_!=INVALID_NODE_ID) {
+			observation_->update(fixed_frame_);
 			best_particle_ = particle_filter_.iterate(*observation_);
 			if(best_particle_->pos_it_+1 == slots_.end() && best_particle_->pos_rel_>0.5) {
 				pub_odom_.publish(geometry_msgs::Twist());
@@ -177,6 +181,7 @@ public:
 		expected_variance_(0.01),
 		num_particles_(1000),
 		target_id_(INVALID_NODE_ID), max_node_id_(0),
+		fixed_frame_("/world"),
 		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false)
 	{
 		ros::param::param<double>("fequency", 		fequency_, fequency_);
@@ -184,10 +189,11 @@ public:
 		ros::param::param<double>("max_rot", 		max_rot_, max_rot_);
 		ros::param::param<double>("expected_variance",	expected_variance_, expected_variance_);
 		ros::param::param<int>   ("num_particles",	num_particles_, num_particles_);
+		ros::param::param<std::string>("fixed_frame", 	fixed_frame_, fixed_frame_);
 		
 		srv_query_path_ = nh_.serviceClient<cob_3d_experience_mapping::QueryPath>("/query_path");
 		sub_action_     = nh_.subscribe("action", 1, &MainNode::cb_action, this);
-		sub_costmap_ = nh_.subscribe("costmap",      1, &MainNode::on_costmap_update, this);
+		sub_costmap_ = nh_.subscribe("costmap",      1, &MainNode::on_costmap, this);
 		sub_odom_     = nh_.subscribe("odom", 1, &MainNode::cb_odom,   this);
 		
 		pub_odom_    = nh_.advertise<geometry_msgs::Twist>("desired_odom", 5);
@@ -210,13 +216,31 @@ public:
 		last_time_ts_ = msg->header.stamp.toSec();
 	}
 	
-	void on_costmap_update(const nav_msgs::OccupancyGrid::ConstPtr &msg) {
+	void on_costmap(const nav_msgs::OccupancyGrid::ConstPtr &msg) {
+		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
+		grid_ = *msg;
+		
 		cob_3d_visualization::RvizMarkerManager::get().setFrameId(msg->header.frame_id);
+		
+		sub_costmap_updates_ = nh_.subscribe("costmap_updates",      1, &MainNode::on_costmap_update, this);
+		
+		if(target_id_==INVALID_NODE_ID) return;
+		
+		observation_.reset(new Particles::Observation(grid_) );
+	}
+	
+	void on_costmap_update(const map_msgs::OccupancyGridUpdate::ConstPtr &msg) {
+		grid_.header = msg->header;
+		
+		int index = 0;
+		for(int y=msg->y; y< msg->y+msg->height; y++)
+			for(int x=msg->x; x< msg->x+msg->width; x++)
+				grid_.data[ y * grid_.info.width + x ] = msg->data[ index++ ];
 		
 		if(target_id_==INVALID_NODE_ID) return;
 		
 		boost::unique_lock<boost::mutex> scoped_lock(mtx_);
-		observation_.reset(new Particles::Observation(*msg) );
+		observation_.reset(new Particles::Observation(grid_) );
 	}
 	
 	double frequency() const {return fequency_;}
