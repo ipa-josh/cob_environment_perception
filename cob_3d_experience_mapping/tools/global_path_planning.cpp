@@ -146,7 +146,7 @@ class MainNode : public PathObserver{
 			}
 			else
 				pub_odom_.publish(best_particle_->action(
-					best_particle_->pos_it_->twist_.cwiseProduct(Eigen::Vector2d(1/max_vel_, 1/max_rot_)).maxCoeff()
+					best_particle_->pos_it_->twist_.cwiseAbs().cwiseProduct(Eigen::Vector2d(1/max_vel_, 1/max_rot_)).maxCoeff()
 				));
 		}
 	}
