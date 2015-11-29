@@ -86,14 +86,14 @@ namespace cob_3d_experience_mapping {
 		}
 		
 		TEnergy ft_current_slot_similiarity() const {
-			if(ft_slots_.size()<=2)
+			if(ft_slots_.size()<2)
 				return 1;
 			if(ft_slots_[0].size()<1)
 				return 1;
 			TEnergy sim=0;
 			//boost::math::binomial_distribution<TEnergy> distribution(ft_slots_.size()-1,0.5);
-			for(size_t i=2; i<ft_slots_.size(); i++)
-				sim += (float)(i-1)*2/((ft_slots_.size()-1)*(ft_slots_.size()-2)) * /*boost::math::pdf(distribution, i-1)*/ ft_slot_match(ft_slots_[i], ft_slots_[0]);
+			for(size_t i=1; i<ft_slots_.size(); i++)
+				sim += (float)i*2/((ft_slots_.size())*(ft_slots_.size()-1)) * /*boost::math::pdf(distribution, i-1)*/ ft_slot_match(ft_slots_[i], ft_slots_[0]);
 			return sim;
 		}
 		
