@@ -14,6 +14,7 @@ class MainNode {
 	double fact_right_;
 	double fact_left_;
 	double occ_thr_;
+	double frequency_;
 	std::string fixed_frame_;
 	
 	ros::NodeHandle nh_;	
@@ -22,7 +23,8 @@ class MainNode {
 	ros::Subscriber sub_req_, sub_costmap_, sub_costmap_updates_;
 	ros::Publisher pub_odom_, pub_feature_;
 	
-	ros::Timer timer_explore_;
+	ros::Timer timer_;
+	geometry_msgs::Twist::ConstPtr desired_action_;
 	
 	boost::mutex mtx_;
 	
@@ -31,6 +33,7 @@ public:
 	MainNode() :
 		max_phi_speed_(0.7), path_resolution_(8),
 		fact_right_(0.7), fact_left_(0.75), occ_thr_(30.),
+		frequency_(10),
 		fixed_frame_("/world")
 	{
 		ros::param::param<double>("max_phi_speed", 		max_phi_speed_, max_phi_speed_);
@@ -39,6 +42,7 @@ public:
 		ros::param::param<double>("occ_thr", 			occ_thr_, occ_thr_);
 		ros::param::param<int>   ("path_resolution", 	path_resolution_, path_resolution_);
 		ros::param::param<std::string>("fixed_frame", 	fixed_frame_, fixed_frame_);
+		ros::param::param<double>("frequency", 		frequency_, frequency_);
 		
 		//subscribe to desired odom. message (->action of robot)
 		sub_req_     = nh_.subscribe("desired_odom", 1, &MainNode::cb_desired_odom,   this);
@@ -47,7 +51,7 @@ public:
 		pub_odom_    = nh_.advertise<geometry_msgs::Twist>("action", 5);
 		pub_feature_ = nh_.advertise<std_msgs::Float32MultiArray>("feature", 5);
 		
-		timer_explore_ = nh_.createTimer(ros::Duration(0.5), &MainNode::explore, this);
+		timer_ = nh_.createTimer(ros::Duration(1/frequency_), &MainNode::on_timer, this);
 	}
 	
 	void on_costmap(const nav_msgs::OccupancyGrid::ConstPtr &msg) {
@@ -75,12 +79,17 @@ public:
 	}
 	
 	void calc_feature() {
+		return;
 		const double vel = 0.3;
 		
 		//boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 		double within_prob;
 		PathProbability pp = generatePossiblePaths(grid_, fixed_frame_, path_resolution_, vel, within_prob, fact_right_, fact_left_, occ_thr_);
 		
+		calc_feature(pp);
+	}
+		
+	void calc_feature(const PathProbability &pp) {
 		std_msgs::Float32MultiArray msg;
 		msg.layout.dim.resize(1);
 		msg.layout.data_offset = 0;
@@ -93,8 +102,15 @@ public:
 		pub_feature_.publish(msg);
 	}
 	
+	void on_timer(const ros::TimerEvent& event) {
+		if(desired_action_)
+			move(*desired_action_);
+		else
+			explore();
+	}
+	
 	ros::Time sleep_;
-	void explore(const ros::TimerEvent& event) {
+	void explore() {
 		if(ros::Time::now()<sleep_) return;
 		
 		const double vel = 0.2;
@@ -146,18 +162,21 @@ public:
 	void cb_desired_odom(const geometry_msgs::Twist::ConstPtr &msg) {
 		ROS_INFO("cb_desired_odom");
 		
-		if(timer_explore_.hasPending()) {
-			ROS_INFO("stopping exploration as aim was set");
-		}
-			timer_explore_.stop(); //stop exploring if we want to go somewhere
+		desired_action_ = msg;
+		move(*desired_action_);
+	}
 		
-		geometry_msgs::Twist action = *msg;
+	void move(geometry_msgs::Twist action) {
+		ROS_INFO("move");
+		
 		if(action.linear.x!=0) { //non-special case
 			boost::unique_lock<boost::mutex> scoped_lock(mtx_);
 			
-			PathProbability pp = generatePossiblePaths(grid_, fixed_frame_, path_resolution_, action.linear.x, fact_right_, fact_left_, occ_thr_);
+			double within_prob;
+			PathProbability pp = generatePossiblePaths(grid_, fixed_frame_, path_resolution_, action.linear.x, within_prob, fact_right_, fact_left_, occ_thr_);
 			
-			pp.visualize(action.linear.x);
+			pp.visualize(0.3);
+			calc_feature(pp);
  
 			const size_t org_ind = pp(action.linear.x, action.angular.z);
 			if(org_ind<0 || org_ind>=pp.possible_paths.size()) {
@@ -167,19 +186,22 @@ public:
 			
 			if(pp.possible_paths[org_ind]>=1) {
 				ROS_ERROR("path is block, waiting...");
-				return;
+				
+				action.angular.z = 0;
+				action.linear.x  = 0;
 			}
-			
-			size_t ind = org_ind;
-			
-			//search for local minima
-			while(ind+1<pp.possible_paths.size() && pp.possible_paths[ind]>pp.possible_paths[ind+1]+(ind-org_ind)*(1-fact_right_) )
-				++ind;
-			while(ind<=org_ind && ind>0          && pp.possible_paths[ind]>pp.possible_paths[ind-1]+(org_ind-ind)*(1-fact_left_) )
-				--ind;
-			
-			action.angular.z = pp.angular(ind);
-			action.linear.x  = pp.velocity(ind);
+			else {
+				size_t ind = org_ind;
+				
+				//search for local minima
+				while(ind+1<pp.possible_paths.size() && pp.possible_paths[ind]>pp.possible_paths[ind+1]+(ind-org_ind)*(1-fact_right_) )
+					++ind;
+				while(ind<=org_ind && ind>0          && pp.possible_paths[ind]>pp.possible_paths[ind-1]+(org_ind-ind)*(1-fact_left_) )
+					--ind;
+				
+				action.angular.z = pp.angular(ind);
+				action.linear.x  = pp.velocity(ind);
+			}
 		}
 		
 		pub_odom_.publish(action);

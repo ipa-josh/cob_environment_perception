@@ -45,7 +45,7 @@ class MainNode : public PathObserver{
 	enum {INVALID_NODE_ID=0};
 
 	//parameters
-	double fequency_;
+	double frequency_;
 	double max_vel_, max_rot_;
 	double expected_variance_;
 	int num_particles_;
@@ -145,7 +145,9 @@ class MainNode : public PathObserver{
 				observation_.reset();
 			}
 			else
-				pub_odom_.publish(best_particle_->action(fequency_));
+				pub_odom_.publish(best_particle_->action(
+					best_particle_->pos_it_->twist_.cwiseProduct(Eigen::Vector2d(1/max_vel_, 1/max_rot_)).maxCoeff()
+				));
 		}
 	}
 	
@@ -156,7 +158,7 @@ class MainNode : public PathObserver{
 		
 		size_t pos=0;
 		for(Iterator it=begin; it!=end; it++) {
-			const double vel = factor*it->linear.x;
+			const double vel = std::abs(factor)*it->linear.x;
 			const  double rot = factor*it->angular.z;
 			
 			slots_[pos++] = Slot(vel, rot);
@@ -177,14 +179,14 @@ class MainNode : public PathObserver{
 public:
 
 	MainNode() :
-		fequency_(10.), max_vel_(0.2), max_rot_(0.2),
+		frequency_(5.), max_vel_(0.2), max_rot_(0.2),
 		expected_variance_(0.01),
 		num_particles_(1000),
 		target_id_(INVALID_NODE_ID), max_node_id_(0),
 		fixed_frame_("/world"),
 		server_set_goal_(nh_, "set_goal", boost::bind(&MainNode::exe_set_goal, this, _1), false)
 	{
-		ros::param::param<double>("fequency", 		fequency_, fequency_);
+		ros::param::param<double>("frequency", 		frequency_, frequency_);
 		ros::param::param<double>("max_vel", 		max_vel_, max_vel_);
 		ros::param::param<double>("max_rot", 		max_rot_, max_rot_);
 		ros::param::param<double>("expected_variance",	expected_variance_, expected_variance_);
@@ -243,7 +245,7 @@ public:
 		observation_.reset(new Particles::Observation(grid_) );
 	}
 	
-	double frequency() const {return fequency_;}
+	double frequency() const {return frequency_;}
 			
 	void visualize() {
 		cob_3d_visualization::RvizMarkerManager::get().clear();
@@ -255,6 +257,7 @@ public:
 			Eigen::Affine2d pos = relation;
 			
 			for(size_t i=0; i<slots_.size(); i++) {
+				if( std::abs( (slots_.begin()+i)-best_particle_->pos_it_ ) > 30 ) continue;
 				Eigen::Vector3d v3_1(0,0,0), v3_2(0,0,0);
 				v3_1.head<2>() = pos.translation();
 				pos = slots_[i].getT()*pos;
@@ -268,6 +271,7 @@ public:
 			std::cout<<"particle("<<particle_filter_.weight(best_particle_-particle_filter_.begin())<<"): "<<relation.translation().head<2>().transpose()<<std::endl;
 			std::cout<<"best particles: "<<(best_particle_->pos_it_-slots_.begin())<<" "<<best_particle_->pos_rel_<<"  w="<<particle_filter_.weight(best_particle_-particle_filter_.begin())<<std::endl;
 			 
+			size_t i=0;
 			for(std::vector<statetype>::iterator it=particle_filter_.begin(); it!=particle_filter_.end(); it++)
 			{
 				const double e = particle_filter_.weight(it-particle_filter_.begin());
@@ -279,6 +283,9 @@ public:
 				cob_3d_visualization::RvizMarker scene;
 				scene.sphere(v3);
 				scene.color(1-e,e,0.);
+				
+				++i;
+				if(i>30) break;	//hard limit, otherwise visualization will crash
 			}
 		}
 		
