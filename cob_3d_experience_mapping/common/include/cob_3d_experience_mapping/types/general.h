@@ -18,6 +18,16 @@ namespace cob_3d_experience_mapping {
 	 */
 	struct Empty {};
 	
+	
+	/*! \class SimpleIdTsGenerator
+		\brief Generator for unique identifiers (sequential) which provides empty interface for modification notification.
+
+		Generator for unique identifiers (sequential).
+		It also provides an empty interface for modification notification:
+		 - register modification of State
+		 - register removal of State
+		 - register modification of Feature
+	*/
 	template<class _TState, class _TFeature>
 	class SimpleIdTsGenerator {
 	public:
@@ -26,21 +36,24 @@ namespace cob_3d_experience_mapping {
 		typedef typename TState::ID ID;
 		
 	private:
-		ID running_id_;
-		/*
-		 * std::map<ID, TModification>
-		 */
+		ID running_id_;			//!< internal identifier counter
 		
 	public:
 		SimpleIdTsGenerator() : running_id_(1)
 		{}
 		
+		//!< generate new id
 		ID new_id() {return running_id_++;}
 		
+		//!< register modification, creation, transition change of state
 		void register_modification(const typename TState::TPtr &state)
 		{ }
+		
+		//!< register modification or creation of feature
 		void register_modification(const typename TFeature::TPtr &state)
 		{ }
+		
+		//!< register the removal of a state
 		void register_removal(const typename TState::TPtr &state)
 		{ }
 	};
@@ -52,20 +65,22 @@ namespace cob_3d_experience_mapping {
 	template<class TMeta>
 	class Object {
 	protected:
-		TMeta meta_;
+		TMeta meta_;	//!< custom meta data
 	};
 	
+	/**
+	 * class: DbgInfo
+	 * some additional (not required) information about this state for convenience and evaluation
+	 */
 	struct DbgInfo {
-		std::string name_;
-		std::string info_;
-		Eigen::Vector3f pose_;
+		std::string name_;		//!< name of state
+		Eigen::Vector3f pose_;	//!< absolute pose for evaluation
 		
 		UNIVERSAL_SERIALIZE()
 		{
 		    ROS_ASSERT(version==CURRENT_SERIALIZATION_VERSION);
 		    
 		   ar & UNIVERSAL_SERIALIZATION_NVP(name_);
-		   ar & UNIVERSAL_SERIALIZATION_NVP(info_);
 		}
 	};
 	
@@ -84,35 +99,36 @@ namespace cob_3d_experience_mapping {
 		typedef typename TGraph::OutArcIt TArcOutIterator;
 		typedef typename TGraph::InArcIt TArcInIterator;
 		typedef boost::shared_ptr<State> TPtr;
+		typedef boost::shared_ptr<const State> TConstPtr;
 		typedef _TID ID;
 		typedef _TFeatureClass TFeatureClass;
 		typedef _TLink TLink;
 		typedef std::map<TFeatureClass, uint32_t /*counter*/> TFeatureClassMap;
 		
 	protected:
-		TEnergy dist_dev_, dist_trv_, dist_trv_var_, ft_imp_;
-		TNode node_;
-		TFeatureClassMap ft_class_occurences_;
-		ID id_;
-		int hops_;
+		TEnergy dist_dev_;	//!< deviation distance (=error)
+		TEnergy dist_trv_;	//!< minimal travelled distance (from trv_ and transitions)
+		TEnergy dist_trv_var_; //!< variance of travelled distance (certainity)
+		TEnergy ft_imp_;	//!< improbability of feature injection
+		TNode node_;		//!< node of graph structure
+		TFeatureClassMap ft_class_occurences_;	
+		ID id_;				//!< unique identifier of state (positive: local, negative: external e.g. from server)
+		int hops_;			//!< maximum number of hops which supports this state
 		DbgInfo dbg_;		//!< some debug information like name and additional description (info)
 		bool still_exists_;	//!< flag: false if removed from map completely
 		bool is_active_;	//!< flag: true if present in active state list
-		bool seen_;
-		TLink trv_;
+		TLink trv_;			//!< assumed executed action
 		
-	public:		
-		State(): dist_dev_(0), dist_trv_(0), dist_trv_var_(1), ft_imp_(1), id_(-1), hops_(0), still_exists_(true), is_active_(false), seen_(false) {
-			dbg_.name_ = "INVALID";
+	public:
+		//!< default constructor, only for serialization!
+		State(): dist_dev_(0), dist_trv_(0), dist_trv_var_(1), ft_imp_(1), id_(-1), hops_(0), still_exists_(true), is_active_(false) {
 		}
 		
-		State(const ID &id): dist_dev_(0), dist_trv_(0), dist_trv_var_(1), ft_imp_(1), id_(id), hops_(0), still_exists_(true), is_active_(false), seen_(false) {
-			char buf[128];
-			sprintf(buf, "%d", id_);
-			dbg_.name_ = buf;
+		//!< use this constructor to generate valid states
+		State(const ID &id): dist_dev_(0), dist_trv_(0), dist_trv_var_(1), ft_imp_(1), id_(id), hops_(0), still_exists_(true), is_active_(false) {
 		}
 		
-		
+		//!< helper for serialization by updating some information from external source
 		void update(const State &o) {
 			ft_class_occurences_ = o.ft_class_occurences_;
 			id_ = o.id_;
@@ -142,8 +158,7 @@ namespace cob_3d_experience_mapping {
 		//!< getter for deviation distance
 		inline const TEnergy &dist_dev() const {return dist_dev_;}
 		
-		//!< setter/getter for travel distance
-		//inline TEnergy &dist_trv() {return dist_trv_;}
+		//!< setter for travel distance
 		inline void set_dist_trv(const TEnergy &t) {dist_trv_=t;}
 		//!< getter for travel distance
 		inline const TEnergy &dist_trv() const {return dist_trv_;}
@@ -190,11 +205,6 @@ namespace cob_3d_experience_mapping {
 		inline TEnergy &dist_trv_var() {return dist_trv_var_;}
 		//!< getter for travel distance
 		inline const TEnergy &dist_trv_var() const {return dist_trv_var_;}
-		
-		//!< setter/getter for hop counter
-		inline bool &seen() {return seen_;}
-		//!< getter for hop counter
-		inline bool  seen() const {return seen_;}
 		
 		//!< setter/getter for hop counter
 		inline int &hops() {return hops_;}
@@ -281,7 +291,7 @@ namespace cob_3d_experience_mapping {
 		inline TEnergy get_feature_prob() const {return 1-ft_imp_;}
 		
 		//!< reset feature probability to default (no feature present)
-		void reset_feature() {ft_imp_=1;seen_=false;}
+		void reset_feature() {ft_imp_=1;}
 		
 		UNIVERSAL_SERIALIZE()
 		{
@@ -414,6 +424,7 @@ namespace cob_3d_experience_mapping {
 		typedef _TID TID;
 		typedef typename TInjection::TType TType;
 		typedef boost::shared_ptr<Feature> TPtr;
+		typedef boost::shared_ptr<const Feature> TConstPtr;
 		typedef void* StateHandle;
 		typedef typename TInjection::TState::TFeatureClass TFeatureClass;
 		
@@ -468,11 +479,6 @@ namespace cob_3d_experience_mapping {
 			if(it==injections_.end()) {
 				injections_.insert(typename InjectionMap::value_type(h, Connection(inj, 1, 1-pos, var)));
 				
-				//debug
-				char buf[32];
-				sprintf(buf,"ft%d ", id_.id());
-				inj->dst()->dbg().info_ += buf;
-				
 				DBG_PRINTF("add feature %d -> %d with (%f/%f)\n", id_.id(), inj->dst()->id(), 1-pos, var);
 				
 				return true;
@@ -503,7 +509,6 @@ namespace cob_3d_experience_mapping {
 				
 				if(update)
 					it->second.state_->dst()->update(ts, std::min(max_occ, (int)injections_.size()), est_occ, it->second.counter_, ft_cl, prob);
-				it->second.state_->dst()->seen() = true;
 				
 				DBG_PRINTF("injectXYZ %d -> %d with %d\n", id_.id(), it->second.state_->dst()->id(), (int)(injections_.size()+est_occ));
 			}
