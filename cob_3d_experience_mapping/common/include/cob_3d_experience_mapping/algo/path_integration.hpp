@@ -1,16 +1,4 @@
 //path integration (input from odometry)
-#include "../helpers/gpx.hpp"
-
-template<class V, class T>
-bool _dbg_cmp_le_rad(const V &a, const V &b, const T t) {
-	for(int i=0; i<a.rows(); i++) {
-		if( M_PI - std::fabs(std::fmod(std::fabs(a(i) - b(i)), 2*M_PI) - M_PI) > t )
-			return false;
-	}
-	return true;
-}
-
-
 
 template<class TGraph, class TMapStates, class TMapTransformations, typename TState>
 void insert_state(TGraph &graph, TMapStates &states, TMapTransformations &trans, TState &new_state) {
@@ -55,66 +43,26 @@ void init(TGraph &graph, TContext &ctxt, TMapStates &states, TMapTransformations
 	//insert_state<TTransformation>(graph, states, trans, ctxt.virtual_state(), ctxt.current_active_state());
 }
 
-template<class TStateVector, class TEnergyFactor, class TGraph, class TContext, class TMapStates, class TMapTransformations, class TTransformation>
-void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt, TMapStates &states, TMapTransformations &trans, const TTransformation &odom, const TTransformation &odom_derv, const Eigen::Vector3f &dbg_pose)
+template<class TEnergyFactor, class TGraph, class TContext, class TMapStates, class TMapTransformations, class TTransformation>
+void path_integration(TGraph &graph, TContext &ctxt, TMapStates &states, TMapTransformations &trans, const TTransformation &odom, const TTransformation &odom_derv, const Eigen::Vector3f &dbg_pose)
 {
 	typedef typename TContext::TState TState;
-	typedef typename TStateVector::iterator TIter;
+	typedef typename TContext::TActList::iterator TIter;
 	typedef typename TState::TArcOutIterator TArcIter_out;
 	typedef typename TState::TArcInIterator TArcIter_in;
 	typedef typename TState::TLink TLink;
 	
 	boost::lock_guard<boost::mutex> guard(ctxt.get_mutex());	//TODO: reduce locking area
 	
-#ifndef NDEBUG
-	{
-		TIter begin = active_states.begin();
-		TIter end   = active_states.end();
+	if(ctxt.needs_sort())
+		std::sort(ctxt.active_states().begin(), ctxt.active_states().end(), sorting::energy_order<typename TContext::TActList::value_type>);
+	assert( sorting::is_sorted(ctxt.active_states().begin(), ctxt.active_states().end(), sorting::energy_order<typename TContext::TActList::value_type>) );
 		
-		if(ctxt.needs_sort())
-			std::sort(begin, end, sorting::energy_order<typename TStateVector::value_type>);
-		assert( sorting::is_sorted(begin, end, sorting::energy_order<typename TStateVector::value_type>) );
-		
-		/*for(TIter it=begin; it!=end; it++) {
-			DBG_PRINTF("state %f %f\n", (*it)->dist_h(), (*it)->dist_dev());
-			if(it+1!=end)
-				ROS_ASSERT( (*it)->d()<=(*(it+1))->d() );
-		}*/
-		ROS_ASSERT(ctxt.current_active_state()==*begin);
-		
-		//debug
-		{
-			int i=0;
-			DBG_PRINTF("current_list");
-			for(TIter it=begin; it!=end; it++) {
-				bool gt = (dbg_pose.template head<2>()-(*it)->dbg().pose_.template head<2>()).norm()<ctxt.param().debugging_prox_thr_(0);
-				gt &= _dbg_cmp_le_rad<Eigen::Matrix<typename TState::TEnergy,1,1>, typename TState::TEnergy>(dbg_pose.template tail<1>(),(*it)->dbg().pose_.template tail<1>(),ctxt.param().debugging_prox_thr_(1));
-				
-				if(i==0)
-					DBG_PRINTF("%c\n",gt?'o':'*');
-				
-				bool gti = ctxt.virtual_state() && (*it)->id() < ctxt.virtual_state()->id()-10;
-				gti &= (dbg_pose.template head<2>()-(*it)->dbg().pose_.template head<2>()).norm()<2*ctxt.param().debugging_prox_thr_(0);
-				gti &= _dbg_cmp_le_rad<Eigen::Matrix<typename TState::TEnergy,1,1>, typename TState::TEnergy>(dbg_pose.template tail<1>(),(*it)->dbg().pose_.template tail<1>(),2*ctxt.param().debugging_prox_thr_(1));
-				DBG_PRINTF("%d:\t %f:%f:%f:%d   %s %s\n", (*it)->id(), (*it)->dist_dev(), (*it)->dist_trv(), (*it)->dist_trv_var(), (*it)->hops(),
-					gt?"MATCH_GT ":" ", gti?"INTEREST":""
-				);
-				++i;
-				//if(i>3) break;
-			}
-			DBG_PRINTF("\n");
-		}
-	}
-	
+	assert(ctxt.current_active_state()==*ctxt.active_states().begin());
 	assert(ctxt.active_states().size()>0);
 	assert(ctxt.current_active_state());
 	
-	DBG_PRINTF("current id %d\n", ctxt.current_active_state()->id());
-
-	static Debug_GPX gpx("/tmp/reloc.gpx");
-	
-	gpx.add_pt(ctxt.current_active_state()->dbg().pose_(1), ctxt.current_active_state()->dbg().pose_(0));
-#endif
+	debug::print_active_list(ctxt, dbg_pose);
 
 	typename TState::TEnergy dev_increment = ctxt.add_odom(odom.get_data(), odom_derv.get_data());
 	if(ctxt.virtual_state() && ctxt.virtual_transistion()) {		
@@ -123,58 +71,27 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		//dev_increment = ctxt.normalize(odom.get_data()).norm();
 		ctxt.virtual_state()->dist_dev() +=   dev_increment;
 		
-		DBG_PRINTF("%d changing dist V (%f/%f) by (%f, %f)\n", ctxt.virtual_state()->id(), ctxt.virtual_state()->dist_trv(), ctxt.virtual_state()->dist_dev(), dev_increment, (1-ctxt.ft_current_slot_similiarity()));
+		debug::print_changing_dist_V(ctxt, dev_increment);
 	}
 
 	if(!ctxt.virtual_state() || (ctxt.last_active_state()!=ctxt.current_active_state() && ctxt.current_active_state()->dist_trv()<=0) || (ctxt.current_active_state()!=ctxt.virtual_state() && ctxt.current_active_state()->dist_dev()<ctxt.last_dist_min() && ctxt.current_active_state()->dist_trv()<=0) || ctxt.virtual_state()->dist_trv()<=0 || ctxt.current_active_state()->dist_trv()<=-1) {
-		
-		if(ctxt.virtual_state()) {
-			ctxt.virtual_transistion()->dbg();
-		}
-	
-		DBG_PRINTF("resetting virtual state %d (%f)\n",
-			(int)(ctxt.last_active_state()!=ctxt.current_active_state()),
-			ctxt.virtual_state()?ctxt.virtual_state()->dist_trv():0.
-		);
+		debug::print_resetting_virtual_state(ctxt);
 			
-		typename TState::TEnergy offset = 0;
 		bool exchange_active_state = false;
 		if(ctxt.current_active_state()==ctxt.virtual_state()) {
 			
 			ctxt.virtual_transistion()->dst() = ctxt.current_active_state();
 			ctxt.ft_add_features(ctxt.virtual_transistion());
 		
-#ifndef NDEBUG
-			DBG_PRINTF("virtual state is inserted to map (action dist.: %f)\n", ctxt.virtual_transistion()->dist());
-			ctxt.virtual_transistion()->dbg();
+			debug::print_insert_virtual_state(ctxt);
 			
-			DBG_PRINTF("dev vec %f \t%f\n", ctxt.virtual_transistion()->deviation()(0), ctxt.virtual_transistion()->deviation()(2));
-			DBG_PRINTF("tr  vec %f \t%f\n", ctxt.virtual_transistion()->get_data()(0), ctxt.virtual_transistion()->get_data()(2));
-#endif
 			exchange_active_state = true;
 			
-			active_states[0]->is_active() = false;
-			active_states[0]->hops() = 0;
+			ctxt.active_states().front()->is_active() = false;
+			ctxt.active_states().front()->hops() = 0;
 		}
 		else {
-			//if(ctxt.last_active_state())
-			//	offset = 2*ctxt.param().deviation_factor_;	//TODO: user-defined factor, change...
-			offset = 0.5f*ctxt.distance_sum();
-
-			//TODO: check for connected states			
-			TIter begin = active_states.begin();
-			TIter end   = active_states.end();
-			for(TIter it=begin+1; it!=end; it++) {
-				if(*it != ctxt.virtual_state() && (*it)->id()+10<ctxt.current_active_state()->id()) {
-					offset = std::min(offset, (*it)->dist_dev()-ctxt.current_active_state()->dist_dev());
-					break;
-				}
-			}
-			
-			offset += dev_increment;
-			
-			DBG_PRINTF_URGENT("relocalized %d -> %d with %d hops\n", ctxt.last_active_state()?ctxt.last_active_state()->id():-1, ctxt.current_active_state()?ctxt.current_active_state()->id():-1,
-			ctxt.current_active_state()?ctxt.current_active_state()->hops():0);
+			debug::print_relocalized(ctxt);
 			
 			if(ctxt.last_active_state()!=ctxt.current_active_state() && ctxt.last_active_state() && ctxt.current_active_state()) {
 				
@@ -185,7 +102,6 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 						exist=true;
 						
 						assert(trans[ait]->dst());
-						DBG_PRINTF("ids %d %d\n", trans[ait]->dst()->id(), ctxt.current_active_state()->id());
 						assert(trans[ait]->dst() == ctxt.current_active_state());
 						ctxt.ft_add_features(trans[ait]);
 
@@ -193,39 +109,15 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 					}
 				}
 				
-				if(exist) {
-					DBG_PRINTF("not inserted new link as exists already\n");
-				}
-				else {
-		
+				if(!exist) {
 					ctxt.virtual_transistion()->dst() = ctxt.current_active_state();
 					ctxt.ft_add_features(ctxt.virtual_transistion());
 		
 					insert_transistion(graph, trans, ctxt.current_active_state(), ctxt.virtual_transistion());
 					ctxt.id_generator().register_modification(ctxt.current_active_state());
-	
-					DBG_PRINTF("inserted new link %d -> %d", ctxt.virtual_transistion()->src()->id(), ctxt.current_active_state()->id());
 				}
-			
-#ifndef NDEBUG
-				std::cout<<"old pose: "<<ctxt.last_active_state()->dbg().pose_.transpose()<<std::endl;
-				std::cout<<"new pose: "<<ctxt.current_active_state()->dbg().pose_.transpose()<<std::endl;
-				std::cout<<"cur pose: "<<dbg_pose.transpose()<<std::endl;
 				
-				bool gt = (dbg_pose.template head<2>()-ctxt.current_active_state()->dbg().pose_.template head<2>()).norm()<=ctxt.param().debugging_prox_thr_(0)*2;
-				gt &= _dbg_cmp_le_rad<Eigen::Matrix<typename TState::TEnergy,1,1>, typename TState::TEnergy>(dbg_pose.template tail<1>(),ctxt.current_active_state()->dbg().pose_.template tail<1>(), ctxt.param().debugging_prox_thr_(1)*2);
-				
-				DBG_PRINTF_URGENT("pose match %f %f "
-					, (dbg_pose.template head<2>()-ctxt.current_active_state()->dbg().pose_.template head<2>()).norm() * 40008000 / 360 
-					, (ctxt.last_active_state()->dbg().pose_.template head<2>()-ctxt.current_active_state()->dbg().pose_.template head<2>()).norm() * 40008000 / 360 );
-				DBG_PRINTF_URGENT( (dbg_pose.template head<2>()-ctxt.current_active_state()->dbg().pose_.template head<2>()).norm() * 40008000 / 360<=(dbg_pose(2)+ctxt.current_active_state()->dbg().pose_(2))?
-					"SUCCESS1  ":"FAILED1  "
-				);
-				DBG_PRINTF_URGENT( (ctxt.last_active_state()->dbg().pose_.template head<2>()-ctxt.current_active_state()->dbg().pose_.template head<2>()).norm() * 40008000 / 360<=(ctxt.last_active_state()->dbg().pose_(2)+ctxt.current_active_state()->dbg().pose_(2))?
-					"SUCCESS2 ":"FAILED2 "
-				);
-				DBG_PRINTF_URGENT( gt ? "SUCCESS3\n":"FAILED3\n"	);
-#endif
+				debug::print_relocalized(ctxt, exist, dbg_pose);
 			}
 
 			ctxt.remove_state(ctxt.virtual_state());
@@ -243,8 +135,6 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		
 		ctxt.virtual_state()->dbg().pose_ = dbg_pose;
 		
-		if(ctxt.virtual_transistion()) DBG_PRINTF("virt trans A with dev %f and offset %f\n", ctxt.virtual_transistion()->deviation().norm(), offset);
-		
 		insert_state(graph, states, trans, ctxt.virtual_state());
 		ctxt.virtual_transistion().reset(new TTransformation(ctxt.current_active_state()));
 		insert_transistion(graph, trans, ctxt.virtual_state(), ctxt.virtual_transistion());
@@ -252,9 +142,9 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		ctxt.last_active_state() = ctxt.current_active_state();
 		
 		if(exchange_active_state)
-			active_states[0] = ctxt.virtual_state();
+			ctxt.active_states().front() = ctxt.virtual_state();
 		else
-			active_states.push_back(ctxt.virtual_state());
+			ctxt.active_states().push_back(ctxt.virtual_state());
 	}
 	
 	ctxt.ft_new_slot();
@@ -268,8 +158,8 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 	if(ctxt.virtual_transistion()) DBG_PRINTF("virt trans B with dev %f\n", ctxt.virtual_transistion()->deviation().norm());
 	
 	{
-		TIter begin = active_states.begin();
-		TIter end   = active_states.end();
+		TIter begin = ctxt.active_states().begin();
+		TIter end   = ctxt.active_states().end();
 		
 		//step 2: increase dist.
 		for(TIter it=begin; it!=end; it++) {
@@ -281,42 +171,6 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 			if( (*it)!=ctxt.virtual_state()) {
 				typename TState::TEnergy dev_min = -1, sim_best = 0, E = 0, rel_best=0;
 				
-				#if 0
-				for(TArcIter_out ait((*it)->arc_out_begin(graph)); ait!=(*it)->arc_out_end(graph); ++ait) {
-					typename TState::TEnergy sim, dev, rel;
-					trans[ait]->directed(*it).transition_factor2(odom, ctxt.normalization_factor(), ctxt.deviation_sum(), ctxt.distance_relation(), sim, dev, rel);
-					
-					//TODO: integrate this directly in transition factor
-					//sim = std::min((typename TState::TEnergy)1, sim+odom.deviation());
-					//dev = std::max((typename TState::TEnergy)0, dev-odom.deviation());
-					//dev *= 0.5f;
-					//dev /= rel+1;
-					
-					if(dev_min<0 || dev<dev_min || (dev_min==dev && sim>sim_best)) {
-						dev_min = dev;
-						sim_best= sim;
-						E = dev_min/trans[ait]->get_data().norm();
-						if(E!=E) E=0;
-					}
-				}
-				
-				if((*it)->dist_trv()<0) {
-					//E = E / ctxt.distance_relation();
-					for(TArcIter_in ait((*it)->arc_in_begin(graph)); ait!=(*it)->arc_in_end(graph); ++ait) {
-						typename TIter::value_type opposite = states[(*it)->opposite_node(graph, ait)];
-						if( !opposite->is_active() || opposite == ctxt.virtual_state() || opposite->dist_trv()<0 ) continue;
-						
-						DBG_PRINTF("dist_trv_var bef %f\n", opposite->dist_trv_var());
-						opposite->dist_trv_var() = std::sqrt(1/(1/(opposite->dist_trv_var()*opposite->dist_trv_var()) + E*E));
-						DBG_PRINTF("dist_trv_var aft %f\n", opposite->dist_trv_var());
-					}
-				}
-				if(dev_min<0) {
-					dev_min = ctxt.normalize(odom.get_data()).norm();
-				}
-				
-				(*it)->dist_trv() -= sim_best/*+dev_min+odom.deviation()*/;
-				#else
 				TLink bef = (*it)->travel();
 				const TLink &trv = (*it)->travel(odom);
 				
@@ -359,7 +213,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 						DBG_PRINTF("dist_trv_var aft %f\n", opposite->dist_trv_var());
 					}
 				}
-				#endif
+				
 				(*it)->dist_trv_var() += rel_best;
 				(*it)->dist_trv_var() = std::max((*it)->dist_trv_var(), 0.1f);
 				
@@ -368,7 +222,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/(typename TState::TEnergy)active_states.size());
 				//const typename TState::TEnergy R = std::pow(1-1.f/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/std::sqrt((typename TState::TEnergy)active_states.size()));
 				typename TState::TEnergy R = std::pow(1-(1-(*it)->dist_trv_var())/(typename TState::TEnergy)active_states.size(), (typename TState::TEnergy)(*it)->hops()/std::sqrt((typename TState::TEnergy)active_states.size()));
-				DBG_PRINTF("R=%f   var=%f states=%d hops=%d\n", R, (*it)->dist_trv_var(), (int)active_states.size(), (*it)->hops());
+				DBG_PRINTF("R=%f   var=%f states=%d hops=%d\n", R, (*it)->dist_trv_var(), (int)ctxt.active_states().size(), (*it)->hops());
 				if((*it)->dist_trv()<-(*it)->dist_trv_var()) R=1;
 				//(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*(2*R-1) );
 				(*it)->dist_dev() += std::max((typename TState::TEnergy)0, dev_min+dev_increment*R );
@@ -385,17 +239,8 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 	
 	ctxt.new_ft_slot();
 	
-#ifndef NDEBUG
-	{ //DEBUG
-		if(ctxt.virtual_state()->dbg().info_.find("V")==std::string::npos) ctxt.virtual_state()->dbg().info_ +="V ";
-		if(ctxt.current_active_state()->dbg().info_.find("C")==std::string::npos) ctxt.current_active_state()->dbg().info_+="C ";
-		
-		ctxt.virtual_transistion()->dbg();
-	} //DEBUG
-#endif
-	
-	TIter begin = active_states.begin();
-	TIter end   = active_states.end();
+	const TIter begin = ctxt.active_states().begin();
+	const TIter end   = ctxt.active_states().end();
 	
 	std::list<typename TIter::value_type> to_be_added;
 	
@@ -408,14 +253,11 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		typename TState::TEnergy ft_prob = (*it)->get_feature_prob();
 			
 		assert(ft_prob>=0 && ft_prob<=1);
-		
-		if(ft_prob)
-			DBG_PRINTF("%d: injecting energy %f (feature probability)    %f*%f  %d hops  %f %f\n", (*it)->id(), ft_prob, (*it)->get_feature_prob(), odom.dist(), (*it)->hops(), (*it)->dist_dev(), (*begin)->dist_dev());
+		debug::print_ft_prob_before(**it, ft_prob);
 		
 		(*it)->dist_dev() -= ctxt.distance_relation() * std::min((typename TState::TEnergy)1, ft_prob);
 		
-		if(ft_prob)
-			DBG_PRINTF("%d: new energy %f\n", (*it)->id(), (*it)->dist_dev());
+		debug::print_ft_prob_after(**it, ft_prob);
 	}
 	
 	//step 1: set min. dist.
@@ -518,25 +360,7 @@ void path_integration(TStateVector &active_states, TGraph &graph, TContext &ctxt
 		ctxt.add_to_active(*it, true);
 	
 	//sort again
-	{
-		begin = active_states.begin();
-		end   = active_states.end();
-		std::sort(begin, end, sorting::energy_order<typename TStateVector::value_type>);
-	}
-	
-#ifndef NDEBUG
-	//debug
-	{
-		int i=0;
-		DBG_PRINTF("distlist");
-		for(TIter it=begin; it!=end; it++) {
-			DBG_PRINTF("\t %f:%d:%d", (*it)->dist_dev(), (*it)->dist_trv()<=0, (*it)->id());
-			++i;
-			if(i>3) break;
-		}
-		DBG_PRINTF("\n");
-	}
-#endif
+	std::sort(ctxt.active_states().begin(), ctxt.active_states().end(), sorting::energy_order<typename TContext::TActList::value_type>);
 }
 
 template<class TStateVector>
@@ -544,11 +368,8 @@ void reset_features(TStateVector &active_states)
 {
 	typedef typename TStateVector::iterator TIter;
 	
-	TIter begin = active_states.begin();
-	TIter end   = active_states.end();
-	
 	//reset features
-	for(TIter it=begin; it!=end; it++) {
+	for(TIter it=active_states.begin(); it!=active_states.end(); it++) {
 		(*it)->reset_feature();
 	}
 }
