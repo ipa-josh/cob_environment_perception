@@ -269,7 +269,7 @@ public:
 			}
 			
 			std::cout<<"particle("<<particle_filter_.weight(best_particle_-particle_filter_.begin())<<"): "<<relation.translation().head<2>().transpose()<<std::endl;
-			std::cout<<"best particles: "<<(best_particle_->pos_it_-slots_.begin())<<" "<<best_particle_->pos_rel_<<"  w="<<particle_filter_.weight(best_particle_-particle_filter_.begin())<<std::endl;
+			std::cout<<"best particles: "<<(best_particle_->pos_it_-slots_.begin())<<"/"<<slots_.size()<<" "<<best_particle_->pos_rel_<<"  w="<<particle_filter_.weight(best_particle_-particle_filter_.begin())<<std::endl;
 			 
 			size_t i=0;
 			for(std::vector<statetype>::iterator it=particle_filter_.begin(); it!=particle_filter_.end(); it++)
@@ -278,7 +278,7 @@ public:
 				Eigen::Vector3d v3(0,0,0);
 				v3.head<2>() = relation*it->pose(slots_.begin()).translation();
 				
-				//std::cout<<"particle("<<e<<"): "<<v3.head<2>().transpose()<<std::endl;
+				std::cout<<"particle("<<e<<"): "<<(best_particle_->pos_it_-slots_.begin())<<"/"<<slots_.size()<<v3.head<2>().transpose()<<std::endl;
 				
 				cob_3d_visualization::RvizMarker scene;
 				scene.sphere(v3);
