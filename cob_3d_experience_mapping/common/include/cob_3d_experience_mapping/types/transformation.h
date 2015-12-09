@@ -33,6 +33,7 @@ namespace cob_3d_experience_mapping {
 		typedef Eigen::Matrix<TType, NUM_TRANS+NUM_ROT, 1> TLink;
 		typedef Eigen::Matrix<TType, 2, 1> TDist;
 		typedef boost::shared_ptr<TransformationLink> TPtr;
+		typedef boost::shared_ptr<const TransformationLink> TConstPtr;
 		
 	protected:
 		TLink link_;
@@ -286,6 +287,7 @@ namespace cob_3d_experience_mapping {
 	class Transformation : public _TransformationLink {
 	public:
 		typedef boost::shared_ptr<Transformation> TPtr;
+		typedef boost::shared_ptr<const Transformation> TConstPtr;
 		typedef _TState TState;
 		typedef typename _TransformationLink::TLink TLink;
 		typedef typename _TransformationLink::TDist TDist;
