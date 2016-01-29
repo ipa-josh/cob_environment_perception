@@ -381,6 +381,11 @@ std::vector<ObjectVolume> Classifier_Carton::get_cartons(const ObjectVolume &vol
 	
 	Eigen::Vector3f Pleft3 = volume.bb_in_pose().max(), Pright3 = volume.bb_in_pose().min();
 	
+	Pright3(2) = Pleft3(2);
+	for(size_t i=0; i<classified_planes_.size(); i++) {
+		Pright3(2) = std::min(Pright3(2), (cast(volume.pose()).inverse()*cast(classified_planes_[i].plane_->pose())*classified_planes_[i].plane_->bb_in_pose().center())(2));
+	}
+	
 	//find most left and right points of front
 	CmpSmallestAxis cmpX(projector_front(cast((Eigen::Vector3f)Eigen::Vector3f::UnitX()))-projector_front(cast((Eigen::Vector3f)Eigen::Vector3f::Zero())));
 	for(size_t i=0; i<classified_planes_.size(); i++) {
