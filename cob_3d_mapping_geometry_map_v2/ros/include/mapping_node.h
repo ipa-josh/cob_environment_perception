@@ -24,6 +24,7 @@
 struct SCarton {
 	int id_;
 	Eigen::Vector3d pos_, dim_;
+	int box_count_horizontal_;
 	
 	SCarton(XmlRpc::XmlRpcValue &item) {
 		id_ = item["volume_index"];
@@ -31,8 +32,9 @@ struct SCarton {
 		pos_(1) = item["y"];
 		pos_(2) = item["z"];
 		dim_(0) = item["w"];
-		dim_(1) = item["h"];
+		dim_(1) = item["H"];	//we use shelf height instead of height of volume
 		dim_(2) = item["d"];
+		box_count_horizontal_ = std::max(1, item["box_count_horizontal"]);
 	}
 };
 
@@ -197,24 +199,30 @@ class GeometryNode : public cob_3d_geometry_map::TransformationEstimator {
 		  for(int i=0; i<cartonList.size(); i++)
 		  {
 			SCarton carton(cartonList[i]);
-		
-			Eigen::Vector3f carton_offset = carton.pos_.cast<float>();
-			Eigen::Vector3f carton_orientation = Eigen::Vector3f::UnitY();
-			Eigen::Vector3f carton_size = carton.dim_.cast<float>();
 			
-			carton_offset(0) -= carton_tolerance_left_right;
-			carton_size(0) += 2*carton_tolerance_left_right;
-			
-			carton_offset(1) -= carton_tolerance_top;
-			carton_size(1) += carton_tolerance_top;
-			
-			std::vector<double> widths;
-			widths.push_back(carton.dim_(0));
-			
-			cob_3d_geometry_map::CustomClassifier::Classifier_Carton *carton_front, *carton_side;
-			ctxt_->registerClassifier( carton_front=new cob_3d_geometry_map::CustomClassifier::Classifier_Carton(carton.id_, Eigen::AngleAxisf(0,carton_orientation)*Eigen::Translation3f(carton_offset), carton_size, widths) );
-			ctxt_->registerClassifier( carton_side=new cob_3d_geometry_map::CustomClassifier::Classifier_Carton(carton_front) );
-			classifier_cartons_.push_back(carton_side);
+			for(int n=0; n<carton.box_count_horizontal_; n++) {
+				Eigen::Vector3f carton_offset = carton.pos_.cast<float>();
+				Eigen::Vector3f carton_orientation = Eigen::Vector3f::UnitY();
+				Eigen::Vector3f carton_size = carton.dim_.cast<float>();
+				
+				//generate virtual boxes
+				carton_size(0)   /= carton.box_count_horizontal_;
+				carton_offset(0) += n*carton_size(0);
+				
+				carton_offset(0) -= carton_tolerance_left_right;
+				carton_size(0) += 2*carton_tolerance_left_right;
+				
+				carton_offset(1) -= carton_tolerance_top;
+				carton_size(1) += carton_tolerance_top;
+				
+				std::vector<double> widths;
+				widths.push_back(carton.dim_(0));
+				
+				cob_3d_geometry_map::CustomClassifier::Classifier_Carton *carton_front, *carton_side;
+				ctxt_->registerClassifier( carton_front=new cob_3d_geometry_map::CustomClassifier::Classifier_Carton(carton.id_+n*100, Eigen::AngleAxisf(0,carton_orientation)*Eigen::Translation3f(carton_offset), carton_size, widths) );
+				ctxt_->registerClassifier( carton_side=new cob_3d_geometry_map::CustomClassifier::Classifier_Carton(carton_front) );
+				classifier_cartons_.push_back(carton_side);
+			}
 			
 			ROS_INFO("added carton %d", carton.id_);
 		  }
