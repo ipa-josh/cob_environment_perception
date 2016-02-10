@@ -34,6 +34,7 @@ public:
 
     virtual ~PackedStream()
     {
+		DBG_PRINTF("~PackedStream\n");
         sync();
     }
     
@@ -41,6 +42,7 @@ public:
 
     virtual std::streambuf::int_type underflow()
     {
+		DBG_PRINTF("underflow0\n");
 		if(pos_>=4) {
 			if(close_after_packet_) return traits_type::eof();
 			size_ = pos_ = 0;
@@ -63,12 +65,17 @@ public:
 		pos_+=read_buffer_.size();
         setg(&read_buffer_[0], &read_buffer_[0], &read_buffer_[0]+read_buffer_.size());
         
+		//	return traits_type::eof();
         return traits_type::to_int_type(*this->gptr());
     }
 
     virtual std::streambuf::int_type overflow(std::streambuf::int_type value)
     {
+		//std::cerr<<"write "<<value<<" "<<write<<std::endl;
 		buffer_.push_back(value);
+		
+        //setp(&buffer_[4], &buffer_[0] + buffer_.size());
+        //if (!traits_type::eq_int_type(value, traits_type::eof())) sputc(value);
         return traits_type::not_eof(value);
     };
 
@@ -81,6 +88,8 @@ public:
     void finish() {
 		*((uint32_t*)&buffer_[0]) = (uint32_t)buffer_.size();
 		ios_.write(&buffer_[0], buffer_.size());
+		//for(size_t i=0; i<buffer_.size(); i++) std::cerr<<(int)buffer_[i]<<" ";
+		//std::cerr<<std::endl;
 		ios_.flush();
 		new_frame();
 	}
@@ -94,6 +103,7 @@ public:
 
     virtual ~IOPackedStream()
     {
+		DBG_PRINTF("~IOPackedStream\n");
         delete rdbuf();
     }
     

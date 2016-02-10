@@ -264,9 +264,10 @@ void path_integration(TGraph &graph, TContext &ctxt, TMapStates &states, TMapTra
 	for(TIter it=begin; it!=end; it++) {
 		typename TState::TEnergy border = 1;
 		if((*it)->hops()<=4)
-			border = 1-0.7f*(*it)->hops()/4.f;
+			border = 1-0.5f*(*it)->hops()/4.f;
 		else
-			border = 0.3f+0.4f*std::min(((*it)->hops()-4),4)/4.f;
+			border = 0.5f+0.4f*std::min(((*it)->hops()-4),4)/4.f;
+		border = std::pow(0.9, active_states.size());
 		if((*it)->dist_trv_var()>=border || (/*!(*it)->seen()&&*/(*it)->dist_trv()>(*it)->dist_trv_var()) )
 		//if((*it)->dist_trv_var()>=(0.3f+0.7f*std::min(4, std::abs((*it)->hops()-4))/4.f) || (/*!(*it)->seen()&&*/(*it)->dist_trv()>(*it)->dist_trv_var()) )
 		//if((*it)->dist_trv_var()>=(1-0.7f*std::min(4, (*it)->hops())/4.f) || (/*!(*it)->seen()&&*/(*it)->dist_trv()>(*it)->dist_trv_var()) )

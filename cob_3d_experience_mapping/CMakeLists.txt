@@ -12,6 +12,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   tf_conversions
   pcl_ros
+  tf
+  tf_conversions
   cob_3d_mapping_common
   cmake_modules
   genmsg actionlib_msgs actionlib
@@ -20,8 +22,8 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Eigen REQUIRED)
 
 #add_custom_target(init_submodules_and_build ALL COMMAND cd ${PROJECT_SOURCE_DIR}/libs && git submodule update --init --recursive && make WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/libs/hiberlite)
-add_custom_target(init_submodules ALL COMMAND cd ${PROJECT_SOURCE_DIR}/libs && git submodule update --init --recursive)
-add_custom_target(build_hiberlite ALL COMMAND make WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/libs/hiberlite)
+#add_custom_target(init_submodules ALL COMMAND cd ${PROJECT_SOURCE_DIR}/libs && git submodule update --init --recursive)
+#add_custom_target(build_hiberlite ALL COMMAND make WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/libs/hiberlite)
 
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)

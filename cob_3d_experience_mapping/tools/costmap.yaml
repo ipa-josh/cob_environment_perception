@@ -11,8 +11,8 @@ static_map: false
 
 #begin - COMMENT these lines if you set static_map to true
 rolling_window: true
-width: 1.5
-height: 1.5
+width: 3.5
+height: 3.5
 resolution: 0.05
 #end - COMMENT these lines if you set static_map to true
 

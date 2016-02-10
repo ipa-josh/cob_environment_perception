@@ -38,6 +38,10 @@ with open(sys.argv[1], 'rb') as csvfile:
         c2=0
         if dist<=1. or i==biggest_id: #3m
 			c2=1
+        else:
+			print "error at ", row[2],"/",biggest_id
+			print x1,y1
+			print x2,y2
         corr2+=c2
 
         if i<=biggest_id and i!=last_id:

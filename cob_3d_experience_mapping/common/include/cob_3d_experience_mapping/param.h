@@ -50,7 +50,7 @@ namespace cob_3d_experience_mapping {
 			debugging_prox_thr_(0) = 0.5;
 			debugging_prox_thr_(1) = 0.5;
 			//energy_max_ = 1;//1.25;
-			est_occ_ = 1;
+			est_occ_ = 3;
 			min_age_ = 3;
 			max_active_states_ = 100;
 			default_deviation_factor_ = 0.1;

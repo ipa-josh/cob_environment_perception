@@ -4,13 +4,13 @@
 	
 	<include file="$(find stdr_robot)/launch/robot_manager.launch" />
 	
-	<node type="stdr_server_node" pkg="stdr_server" name="stdr_server" output="screen" args="$(find stdr_resources)/maps/sparse_obstacles.yaml"/>
+	<node type="stdr_server_node" pkg="stdr_server" name="stdr_server" output="screen" args="$(find stdr_resources)/maps/test1.yaml"/>
 
 	<node pkg="tf" type="static_transform_publisher" name="world2map" args="0 0 0 0 0 0  world map 100" />
 	
 	<include if="$(arg gui)" file="$(find stdr_gui)/launch/stdr_gui.launch"/>
 	
-	<node pkg="stdr_robot" type="robot_handler" name="$(anon robot_spawn)" args="add $(find stdr_resources)/resources/robots/pandora_robot.yaml 1 2 0" />
+	<node pkg="stdr_robot" type="robot_handler" name="$(anon robot_spawn)" args="add $(find stdr_resources)/resources/robots/square_robot.xml 1 10 0" />
 	
 
   <!-- turtlebot_teleop_key already has its own built in velocity smoother -->

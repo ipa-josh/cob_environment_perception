@@ -18,12 +18,12 @@
 		<remap from="/irat_red/odom" to="/robot0/odom" />
 	</node>
 	 
-	<node pkg="rosbag" type="play" name="play" args="$(find cob_3d_experience_mapping)/evaluation/datasets/office_odom.bag --clock -d 0.5 -r 4 -s 0">
+	<node pkg="rosbag" type="play" name="play" args="$(find cob_3d_experience_mapping)/evaluation/datasets/office_odom.bag --clock -d 0.5 -r 2 -s 0">
 	</node>
 	
 	
 
-	 <node name="mapping2" pkg="cob_3d_experience_mapping" type="cob_3d_experience_mapping_lemon_cloud_node" output="screen" launch-prefix="xterm -e gdb --ex run --args">
+	 <node name="mapping2" pkg="cob_3d_experience_mapping" type="cob_3d_experience_mapping_lemon_cloud_node" output="screen" >
 		<param name="step_mode" value="false" />
 		<param name="cloud_server" value="localhost:12347" />
 		
@@ -43,7 +43,7 @@
 		<remap from="/irat_red/PoseCell/TopologicalAction" to="/irat_red/PoseCell/TopologicalAction2" />
 	</node>
 	 
-	<node pkg="rosbag" type="play" name="play2" args="$(find cob_3d_experience_mapping)/evaluation/datasets/office_odom.bag -d 10.5 -r 4 -s 0">
+	<node pkg="rosbag" type="play" name="play2" args="$(find cob_3d_experience_mapping)/evaluation/datasets/office_odom.bag -d 10.5 -r 2 -s 0">
 		<remap from="/robot0/odom" to="/robot0/odom2" />
 	</node>
 </launch>

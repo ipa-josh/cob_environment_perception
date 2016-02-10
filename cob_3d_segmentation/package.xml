@@ -19,7 +19,6 @@
   <build_depend>actionlib</build_depend>
   <build_depend>actionlib_msgs</build_depend>
   <build_depend>boost</build_depend>
-  <build_depend>cob_3d_features</build_depend>
   <build_depend>cob_3d_mapping_common</build_depend>
   <build_depend>cob_3d_mapping_filters</build_depend>
   <build_depend>cob_3d_mapping_msgs</build_depend>
@@ -39,7 +38,6 @@
   <run_depend>actionlib</run_depend>
   <run_depend>actionlib_msgs</run_depend>
   <run_depend>boost</run_depend>
-  <run_depend>cob_3d_features</run_depend>
   <run_depend>cob_3d_mapping_common</run_depend>
   <run_depend>cob_3d_mapping_filters</run_depend>
   <run_depend>cob_3d_mapping_msgs</run_depend>

@@ -181,7 +181,7 @@ namespace cob_3d_experience_mapping {
 				dev = std::sqrt( std::max((TType)0, tmp2.squaredNorm() - sim*tmp1.dot( -tmp2 )) );
 				
 				//if(sim>1) sim = 1-sim;
-				sim = std::min((TType)2, std::max((TType)0, sim));
+//				sim = std::min((TType)2, std::max((TType)0, sim));
 				//sim = std::min((TType)10, std::max((TType)0, sim));
 				//rel = sim*tmp1.norm()/tmp2.norm();
 				
@@ -196,6 +196,8 @@ namespace cob_3d_experience_mapping {
 				//rel = (er-dev1).cwiseMax(TLink::Zero()).sum();
 				
 				rel = std::max((er-general_deviation.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum(), (er-deviation_.cwiseProduct(thr.cwiseInverse())).cwiseMax(TLink::Zero()).sum());
+				rel = 1-tmp1.normalized().dot( -(tmp2-dev1).cwiseMax(TLink::Zero()).normalized() );
+				if(rel!=rel) rel=0;
 				
 				er = tmp2.cwiseAbs()-tmp1.cwiseAbs();
 				//for(int i=0; i<tmp1.rows(); i++)
@@ -220,9 +222,9 @@ namespace cob_3d_experience_mapping {
 				//dev = relation_factor*(std::pow(1/relation_factor, er.norm()/dev1.norm())-1);
 				//dev = relation_factor*(std::exp(er.norm()/dev1.norm())-1);
 				//dev = std::max((TType)0, er.sum()-relation_factor*tmp2.norm());
-				//dev = er.sum();
+				rel = dev = er.sum();
 				//dev = er.sum()/tmp1.norm();
-				dev = er.sum();
+				//dev = 1-std::pow(0.25, er.sum());
 				//dev = relation_factor*er.sum()/tmp2.norm();
 				
 				//allowed dev. for odom:

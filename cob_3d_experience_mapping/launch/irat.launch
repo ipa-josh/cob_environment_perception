@@ -4,10 +4,14 @@
 
 	 <node name="mapping" pkg="cob_3d_experience_mapping" type="cob_3d_experience_mapping_lemon_node" output="screen" >
 		<param name="step_mode" value="false" />
-		<remap from="/odom" to="/irat_red/odom" />
-		<remap from="/PoseCell/TopologicalAction" to="/irat_red/PoseCell/TopologicalAction" />
+		<remap from="/odom" to="/newcollege/odom" />
+		<remap from="/PoseCell/TopologicalAction" to="/newcollege/PoseCell/TopologicalAction" />
 	 </node>
 	 
-	  <node name="exp2ft" pkg="cob_3d_experience_mapping" type="exp2ft.py" output="screen" />
+	  <node name="exp2ft" pkg="cob_3d_experience_mapping" type="exp2ft.py" output="screen">
+		<remap from="/irat_red/LocalView/Template" to="/newcollege/LocalView/Template" />
+	  </node>
 	  
+	  <node name="RatSLAMExperienceMap" pkg="ratslam_ros" type="ratslam_em" args="$(find ratslam_ros)/config/config_oxford_newcollege.txt _image_transport:=compressed" cwd="node" required="true" />
+	
 </launch>

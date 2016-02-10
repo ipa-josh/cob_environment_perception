@@ -314,7 +314,11 @@ namespace cob_3d_experience_mapping {
 		TEnergy add_odom(const typename TTransform::TLink &odom, const typename TTransform::TLink &odom_derv) {
 			typename TTransform::TLink tmp = odom_derv.cwiseAbs();
 			//typename TTransform::TLink w = normalize(tmp);
-			typename TTransform::TLink w;w.fill(1);
+			typename TTransform::TLink w;
+			w.fill(1);
+			for(int i=0; i<w.rows(); i++)
+				if(odom(i)==0) w(i)=0;
+				
 			action_sum_ += w.cwiseProduct(tmp);
 			action_num_ += w;
 			

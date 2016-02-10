@@ -10,7 +10,7 @@ ids={}
 pub_si = None
 pub_vt = None
 
-NUM_FEATURES=100
+NUM_FEATURES=1000
 def callback(msg):
 	global ids
 	global pub_si

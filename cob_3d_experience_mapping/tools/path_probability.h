@@ -29,10 +29,8 @@ struct PathProbability {
 	}
 	
 	size_t alpha2ind(const double phi) const {
-		if(!(phi>=-M_PI_2 && phi<M_PI_2))
-			std::cout<<"phi "<<phi<<std::endl;
-		assert(phi>=-M_PI_2 && phi<M_PI_2);
-		return (phi+M_PI_2)/M_PI * possible_paths.size();
+		assert(phi>=-M_PI_2 && phi<=M_PI_2);
+		return std::min( (size_t)((phi+M_PI_2)/M_PI * possible_paths.size()), possible_paths.size()-1);
 	}
 	
 	double ind2alpha(const size_t ind) const {
@@ -132,7 +130,7 @@ PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const
 			rv = trans2d*rv;
 			
 			//const double ry = y*grid.info.resolution;
-			if(rv(0)<=0.001 || val<=0) continue;
+			if(rv(0)<=0 || val<=0) continue;
 			
 			if(std::abs(rv(0))+std::abs(rv(1))<0.05) {
 				within_prob = std::max(within_prob, val);
@@ -148,7 +146,7 @@ PathProbability generatePossiblePaths(const nav_msgs::OccupancyGrid &grid, const
 			const double vel = max_vel * rv(0) / rv.norm();
 			
 			const double phi1 = std::atan2(rv(1),rv(0)*vel);	
-			//printf("%f/%f: \t%f %f %f\n", rv(0), rv(1), phi1, vel, val);		
+			//printf("%f/%f: \t%f %d\n", rx, ry, phi1, (int)pp.alpha2ind(phi1));		
 			pp(phi1) = std::max(pp(phi1), val);
 		}
 #ifdef DEBUG_OUT_PathProbability
@@ -172,7 +170,7 @@ struct Slot {
 	Slot(const double v, const double r) : twist_(v,r) {}
 	
 	Eigen::Affine2d getT(const double rel=1.) {
-		return Eigen::Translation2d(rel*twist_(0),0)*Eigen::Rotation2D<double>(rel*twist_(1));
+		return Eigen::Rotation2D<double>(rel*twist_(1))*Eigen::Translation2d(rel*twist_(0),0);
 	}
 };
 
@@ -190,7 +188,7 @@ namespace Particles {
 		double relative_position() const;
 		
 		Eigen::Affine2d pose(const TPos &begin) {
-			const Eigen::Affine2d T = pos_it_->getT(-pos_rel_);
+			const Eigen::Affine2d T = pos_it_->getT(pos_rel_);
 			if(begin==pos_it_) return T;
 			return pose(begin, pos_it_-1)*T;
 		}
@@ -237,7 +235,7 @@ namespace Particles {
 			
 		geometry_msgs::Twist action(double freq=1) const {
 			geometry_msgs::Twist action;
-			action.linear.x  = pos_it_->twist_(0)/freq;
+			action.linear.x  = pos_it_->twist_(0)/std::abs(freq);
 			action.angular.z = pos_it_->twist_(1)/freq;
 			return action;
 		}
@@ -295,13 +293,11 @@ public:
 	// x2 : X_{n-1}
 	PrecisionType state_fn(const statetype &x1, const statetype &x2) {
 	  //std::cout<<"dist: "<<((x1-x2)-last_odom_).norm()/last_odom_.norm()<<std::endl;
-	  return std::exp( -((x1-x2)-last_odom_).squaredNorm() );
 	  return std::exp( -std::pow( 5*((x1-x2)-last_odom_).norm()/last_odom_.norm(), 2) );//x1.relative_position()>=x2.relative_position()?1:0;//exp(-0.5 * pow((x1 - alpha * x2), 2));
 	}
 
 	PrecisionType observe_fn(const statetype &x, const obsvtype &y) {
-	  if(x.pos_it_->twist_.squaredNorm()==0) return 0;
-	  return 1.-0.5*std::pow( y.prob_[y.prob_(x.pos_it_->twist_(0), std::max(-M_PI_2, std::min(M_PI_2-0.000001, x.pos_it_->twist_(1)) ))], 2);//y.prob(x.twist_);//1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
+	  return 1.-0.5*std::pow( y.prob_[y.prob_(last_odom_(0), last_odom_(1))], 2);//y.prob(x.twist_);//1 / exp(x / 2) * exp(-0.5 * pow(y / beta / exp(x / 2), 2));
 	}
 
 	PrecisionType proposal_fn(const statetype &x1, const statetype &x2, const obsvtype &y) {
@@ -310,8 +306,8 @@ public:
 
 	boost::mt19937 rng_;
 	statetype sampling_fn(const statetype &x, const obsvtype &y) {
-	  boost::normal_distribution<double> distribution_normal(0., 0.01);	//TODO: check
-	  boost::triangle_distribution<double> distribution_triangular(0.8,1.,1.2);
+	  boost::normal_distribution<double> distribution_normal(0., 0.001);	//TODO: check
+	  boost::triangle_distribution<double> distribution_triangular(0.,1.,1.2);
 	  
       boost::variate_generator<boost::mt19937&, boost::normal_distribution<double> > var_nor(rng_, distribution_normal);
       boost::variate_generator<boost::mt19937&, boost::triangle_distribution<double> > var_tri(rng_, distribution_triangular);

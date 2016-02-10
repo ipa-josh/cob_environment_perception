@@ -5,6 +5,20 @@ from numpy import dot, array, sqrt
 
 #http://nbviewer.jupyter.org/github/rlabbe/Kalman-and-Bayesian-Filters-in-Python/blob/master/11-Extended-Kalman-Filters.ipynb
 
+class Position:
+	def __init__(self):
+		self.data = [0,0,0]		#x,y,yaw
+		self.time = 0.
+		
+	def get_x(self):
+		return self.data[0]
+	def get_y(self):
+		return self.data[1]
+	def get_yaw(self):
+		return self.data[2]
+	def get_time(self):
+		return self.time
+		
 class Transition(EKF):
     def __init__(self, src, tgt, int_actions, robot):
         EKF.__init__(self, 3, 2, 2)

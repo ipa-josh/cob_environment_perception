@@ -3,6 +3,7 @@ import rospy
 from nav_msgs.msg import Odometry
 
 from context import Context, Robot
+from transition import Position, Action
 
 class Node:
     
@@ -15,7 +16,9 @@ class Node:
 		rospy.Subscriber("odom", Odometry, self.on_odom)
 	
 	def on_odom(data):
-		action = 
+		action = Action()
+		action.data = [data.twist.twist.linear.x, data.twist.twist.angular.z]
+		action.time = data.header.stamp.to_sec()
 		self.ctxt.on_action(action)
 
 
