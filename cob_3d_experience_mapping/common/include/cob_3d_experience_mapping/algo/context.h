@@ -86,14 +86,14 @@ namespace cob_3d_experience_mapping {
 		}
 		
 		TEnergy ft_current_slot_similiarity() const {
-			if(ft_slots_.size()<=2)
+			if(ft_slots_.size()<2)
 				return 1;
 			if(ft_slots_[0].size()<1)
 				return 1;
 			TEnergy sim=0;
 			//boost::math::binomial_distribution<TEnergy> distribution(ft_slots_.size()-1,0.5);
-			for(size_t i=2; i<ft_slots_.size(); i++)
-				sim += (float)(i-1)*2/((ft_slots_.size()-1)*(ft_slots_.size()-2)) * /*boost::math::pdf(distribution, i-1)*/ ft_slot_match(ft_slots_[i], ft_slots_[0]);
+			for(size_t i=1; i<ft_slots_.size(); i++)
+				sim += (float)i*2/((ft_slots_.size())*(ft_slots_.size()-1)) * /*boost::math::pdf(distribution, i-1)*/ ft_slot_match(ft_slots_[i], ft_slots_[0]);
 			return sim;
 		}
 		
@@ -489,14 +489,22 @@ namespace cob_3d_experience_mapping {
 		//getter/setter
 		//!< settter/getter for active state list
 		inline TActList &active_states() {return active_states_;}
+		//!< getter for active state list
+		inline const TActList &active_states() const {return active_states_;}
+		
 		//!< getter for parameters
 		inline const TParameter &param() const {return param_;}
 		//!< settter/getter for parameters
 		inline TParameter &param_rw() {return param_;}
+		
 		inline typename TState::TPtr current_active_state() {return *active_states_.begin();} //TODO: check
+		inline typename TState::TConstPtr current_active_state() const {return *active_states_.begin();} //TODO: check
 		inline typename TState::TPtr &virtual_state() {return virtual_state_;}
+		inline const typename TState::TConstPtr virtual_state() const {return virtual_state_;}
 		inline typename TTransform::TPtr &virtual_transistion() {return virtual_transistion_;}
+		inline const typename TTransform::TConstPtr virtual_transistion() const {return virtual_transistion_;}
 		inline typename TState::TPtr &last_active_state() {return last_active_state_;}
+		inline const typename TState::TConstPtr last_active_state() const {return last_active_state_;}
 		
 		inline const TEnergy &last_dist_min() const {return last_dist_min_;}
 		inline TEnergy &last_dist_min() {return last_dist_min_;}

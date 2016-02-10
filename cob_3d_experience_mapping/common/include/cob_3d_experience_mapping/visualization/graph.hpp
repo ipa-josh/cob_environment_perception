@@ -9,7 +9,6 @@ namespace cob_3d_experience_mapping {
 		template<class TGraph, class TMapStates, class TMapTransformations, class TNode, class TArcIter>
 		struct VisualizationHandler {
 			static void init() {
-	std::cout<<"init vis"<<std::endl;
 				cob_3d_visualization::RvizMarkerManager::get()
 					.createTopic("expierience_mapping_marker")
 					.setFrameId("/base_link");
@@ -75,7 +74,7 @@ namespace cob_3d_experience_mapping {
 					cob_3d_visualization::RvizMarker scene;
 					char buf[256];
 					sprintf(buf, " h=%.3f o=%.3f", act_node->dist_trv(), act_node->dist_dev());
-					scene.text(act_node->dbg().name_+" "+act_node->dbg().info_+buf);
+					scene.text(act_node->dbg().name_+" "+buf);
 					scene.move(pos+0.3*Eigen::Vector3f::UnitZ());
 				}
 				

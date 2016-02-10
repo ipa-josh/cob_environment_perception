@@ -9,6 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   lemon
   cob_3d_visualization
+  tf
+  tf_conversions
   pcl_ros
   cob_3d_mapping_common
   cmake_modules
