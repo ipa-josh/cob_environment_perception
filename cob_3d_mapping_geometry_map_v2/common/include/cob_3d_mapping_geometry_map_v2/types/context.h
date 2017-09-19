@@ -63,10 +63,13 @@ public:
 	void classify(const Context::Ptr &ctxt, const Classifier::Ptr &classifier, const bool single_shot);
 	void optimize(const Context::Ptr &ctxt);
 	
-	void volume_search_in_volume(const Eigen::AlignedBox<Scalar, Dim> &bb, std::vector<Object::Ptr> &result);
-	void volume_search_in_points(const Eigen::AlignedBox<Scalar, Dim> &bb, std::vector<Object::Ptr> &result);
+	void volume_search_in_volume(const Eigen::AlignedBox<Scalar, Dim> &bb, std::vector<Object::Ptr> &result) const;
+	void volume_search_in_points(const Eigen::AlignedBox<Scalar, Dim> &bb, std::vector<Object::Ptr> &result) const;
 	
 	void intersects(const Intersection_Volume &search_param, std::vector<Object::Ptr> &result);
+	
+	inline std::vector<Object::Ptr>::const_iterator begin() const {return objs_.begin();}
+	inline std::vector<Object::Ptr>::const_iterator end() const {return objs_.end();}
 	
 	inline std::vector<Object::Ptr>::iterator begin() {return objs_.begin();}
 	inline std::vector<Object::Ptr>::iterator end() {return objs_.end();}

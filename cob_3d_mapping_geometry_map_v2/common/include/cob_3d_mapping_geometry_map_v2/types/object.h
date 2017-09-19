@@ -61,6 +61,7 @@ class Object {
 public:
 	typedef int TID;
 	typedef boost::shared_ptr<Object> Ptr;
+	typedef boost::shared_ptr<const Object> ConstPtr;
 	typedef boost::shared_ptr<Context> ContextPtr;
 	typedef std::map<int, boost::shared_ptr<Class> > ClassList;
 	
