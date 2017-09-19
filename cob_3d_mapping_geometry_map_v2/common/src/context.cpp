@@ -171,12 +171,12 @@ struct VolumeIntersection
 	}
 };
 
-void Context::volume_search_in_volume(const Eigen::AlignedBox<Scalar, Dim> &bb, std::vector<Object::Ptr> &result) {
+void Context::volume_search_in_volume(const Eigen::AlignedBox<Scalar, Dim> &bb, std::vector<Object::Ptr> &result) const {
 	VolumeIntersection<std::vector<Object::Ptr>, BVH_Volume> intersector(bb, result);
 	Eigen::BVIntersect2(search_volume_, intersector);
 }
 
-void Context::volume_search_in_points(const Eigen::AlignedBox<Scalar, Dim> &bb, std::vector<Object::Ptr> &result) {
+void Context::volume_search_in_points(const Eigen::AlignedBox<Scalar, Dim> &bb, std::vector<Object::Ptr> &result) const {
 	VolumeIntersection<std::vector<Object::Ptr>, BVH_Point> intersector(bb, result);
 	Eigen::BVIntersect2(search_point_, intersector);
 }
