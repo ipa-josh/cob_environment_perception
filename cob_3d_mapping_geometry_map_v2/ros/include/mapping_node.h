@@ -4,6 +4,7 @@
 
 #include <cob_3d_mapping_geometry_map_v2/types/context.h>
 #include <cob_3d_mapping_geometry_map_v2/visualization/marker.h>
+#include <cob_3d_mapping_geometry_map_v2/registration/registration.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -273,8 +274,16 @@ class GeometryNode : public cob_3d_geometry_map::TransformationEstimator {
 	}
 	
 	virtual bool register_scene(const cob_3d_geometry_map::Context::ConstPtr &new_scene, const cob_3d_geometry_map::Context::ConstPtr &map, nuklei::kernel::se3 &tf_out) {
+		using namespace cob_3d_geometry_map;
+		
 		tf_out = cob_3d_geometry_map::cast(tf2target_);
-		return true;
+		
+		registration::ContextRegistration<
+		 registration::CorrespondenceEstimator<float>,
+		 registration::CovarianceEstimator<float>
+		> reg(tf_out);
+	
+		return reg.register_scene(new_scene, map, tf_out);
 	}
 	
 public:
