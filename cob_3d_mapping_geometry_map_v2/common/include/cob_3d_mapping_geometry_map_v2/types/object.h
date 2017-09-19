@@ -146,6 +146,13 @@ public:
 			bb.extend(cast(pose_)*bb_.corner( (TBB::CornerType)i ));
 		return bb;
 	}
+	TBB bb_in_context(const Eigen::Affine3f &tf) const {
+		TBB bb;
+		bb.setEmpty();		
+		for(int i=0; i<8; i++)
+			bb.extend(tf*cast(pose_)*bb_.corner( (TBB::CornerType)i ));
+		return bb;
+	}
 	
 	virtual std::string type() {return "ObjectVolume";}
 	
