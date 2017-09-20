@@ -27,6 +27,9 @@ public:
 		const ObjectVolume *vol = dynamic_cast<const ObjectVolume*>(src.get());
 		if(!vol) return;
 		
+		assert(map_);
+		assert(new_scene_);
+		
 		std::vector<Object::Ptr> result;
 		Eigen::Affine3f aff; aff.matrix() = transformation.cast<float>();
 		map_->volume_search_in_volume(vol->bb_in_context(aff), result);
@@ -62,7 +65,7 @@ public:
 		Eigen::Affine3f aff = cast(vol->pose());
 		pt_.template head<3>() = (aff*((bb.min()+bb.max())/2)).cast<Scalar>();
 		
-		ObjectVolume::TBB::VectorType tl = bb.corner( ObjectVolume::TBB::CornerType::TopLeft );
+		/*ObjectVolume::TBB::VectorType tl = bb.corner( ObjectVolume::TBB::CornerType::TopLeft );
 		ObjectVolume::TBB::VectorType tr = bb.corner( ObjectVolume::TBB::CornerType::TopRight );
 		ObjectVolume::TBB::VectorType bl = bb.corner( ObjectVolume::TBB::CornerType::BottomLeft );
 		ObjectVolume::TBB::VectorType tlf = bb.corner( ObjectVolume::TBB::CornerType::TopLeftFloor );
@@ -72,7 +75,11 @@ public:
 		T.col(1) = 0.5*(bl-tl);
 		T.col(2) = 0.5*(tlf-tl);
 		
-		cov_ = (aff*(T*T.transpose())).cast<Scalar>();
+		cov_ = (aff*(T*T.transpose())).cast<Scalar>();*/
+		
+		Eigen::Matrix3f T = Eigen::Matrix3f::Identity();
+		T(2,2) = 0.001;
+		cov_ = (aff.rotation()*T*aff.rotation().transpose()).cast<Scalar>();
 	}
 	
 	inline Matrix3 cov() const {return cov_;}
@@ -101,6 +108,8 @@ private:
 	int max_inner_iterations_;
 	Scalar rotation_epsilon_;
 	Scalar transformation_epsilon_;
+	int max_iterations_;
+	int nr_iterations_;
 	
 	/** \brief Set the rotation epsilon (maximum allowable difference between two 
 	* consecutive rotations) in order for an optimization to be considered as having 
@@ -366,15 +375,16 @@ private:
 
 public:
 
-	GICP() : converged_(false), max_inner_iterations_(20), rotation_epsilon_(2e-3), transformation_epsilon_(5e-4)
+	GICP() : converged_(false), max_inner_iterations_(20), rotation_epsilon_(2e-3), transformation_epsilon_(5e-4), max_iterations_(100), nr_iterations_(0)
 	{}
 	
 	bool converged() const  {return converged_;}
 	
 	template<class CorsEstimator, class CovarianceGen>
-	bool compute(CorsEstimator &estimator, Matrix4 transformation, const std::vector<Object::ConstPtr> &src, const std::vector<Object::ConstPtr> &tgt) {
+	bool compute(CorsEstimator &estimator, Matrix4 &transformation, const std::vector<Object::ConstPtr> &src, const std::vector<Object::ConstPtr> &tgt) {
 		
 		converged_ = false;
+		nr_iterations_ = 0;
 		Matrix4 previous_transformation;
 		
 		while(!converged_) {
@@ -387,7 +397,7 @@ public:
 			for(size_t i=0; i<src.size(); i++) {
 				//find correspondences
 				std::vector<int> cors_idx;
-				estimator.findCorrespondences(src[i], tgt, transformation, cors_idx);
+				estimator.findCorrespondences(src[i], tgt, transformation.inverse(), cors_idx);
 				mahalanobis.resize (mahalanobis.size()+cors_idx.size(), Matrix3::Identity ());
 				source_indices.resize(source_indices.size()+cors_idx.size());
 				target_indices.resize(target_indices.size()+cors_idx.size());
@@ -397,7 +407,7 @@ public:
 				for(size_t j=0; j<cors_idx.size(); j++) {					
 					CovarianceGen cgen2(tgt[cors_idx[j]]);
 					const Matrix3 &C2 = cgen2.cov();
-					Matrix3 &M = mahalanobis[i];
+					Matrix3 &M = mahalanobis[cnt];
 					M = R * C1;
 					// temp = M*R' + C2 = R*C1*R' + C2
 					Matrix3 temp = M * R.transpose();
@@ -413,11 +423,11 @@ public:
 			}
 			
 			previous_transformation = transformation;
+			Scalar delta = 0.;
 			try
 		   {
 			 estimateRigidTransformationBFGS(pt_src, pt_tgt, transformation);
 			 /* compute the delta from this iteration */
-			 Scalar delta = 0.;
 			 for(int k = 0; k < 4; k++) {
 			   for(int l = 0; l < 4; l++) {
 				 Scalar ratio = 1;
@@ -436,6 +446,13 @@ public:
 			 std::cout << "[computeTransformation] Optimization issue " << std::endl;
 			 return false;
 		   }
+		   
+		   nr_iterations_++;
+		   // Check for convergence
+		   if (nr_iterations_ >= max_iterations_ || delta < 1)
+		   {
+			 converged_ = true;
+		   }
   
 		}
 		
@@ -448,24 +465,34 @@ template<class TCorrespondenceEstimator, class TCovarianceGen>
 class ContextRegistration : public TransformationEstimator {
 protected:
 	TCorrespondenceEstimator cor_est_;
-	nuklei::kernel::se3 initial_guess_;
 	
 public:
 	typedef typename TCorrespondenceEstimator::Scalar Scalar;
 	
-	ContextRegistration(const nuklei::kernel::se3 &initial_guess) : initial_guess_(initial_guess)
+	ContextRegistration()
 	{}
 	
 	TCorrespondenceEstimator 		&getCorrespondenceEstimator() 				{return cor_est_;}
 	const TCorrespondenceEstimator 	&getCorrespondenceEstimator() const 	{return cor_est_;}
 
 	virtual bool register_scene(const Context::ConstPtr &new_scene, const Context::ConstPtr &map, nuklei::kernel::se3 &tf_out) {
-		GICP<Scalar> gicp;
-		std::vector<Object::ConstPtr> src, tgt; //TODO: 
+		if(!map || map->begin()==map->end()) return true; //initial
 		
-		typename GICP<Scalar>::Matrix4 transformation; //TODO: 
-		return gicp.template compute<TCorrespondenceEstimator, TCovarianceGen>
+		GICP<Scalar> gicp;
+		std::vector<Object::ConstPtr> src(new_scene->begin(), new_scene->end());
+		std::vector<Object::ConstPtr> tgt(map->begin(), map->end());
+		
+		cor_est_.setNewScene(new_scene);
+		cor_est_.setMap(map);
+		
+		typename GICP<Scalar>::Matrix4 transformation = cast(tf_out).matrix().cast<Scalar>();
+		const bool converged = gicp.template compute<TCorrespondenceEstimator, TCovarianceGen>
 			(cor_est_, transformation, src, tgt);
+		
+		Eigen::Affine3f aff; aff.matrix() = transformation.cast<float>();
+		tf_out = cast(aff);
+		
+		return converged;
 	}
 };
 

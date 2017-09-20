@@ -9,5 +9,7 @@ void test_registration_impl() {
 	registration::ContextRegistration<
 	 registration::CorrespondenceEstimator<float>,
 	 registration::CovarianceEstimator<float>
-	> reg(cast(tf));
+	> reg;
+	
+	//(cast(tf));
 }

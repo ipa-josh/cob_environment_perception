@@ -281,7 +281,7 @@ class GeometryNode : public cob_3d_geometry_map::TransformationEstimator {
 		registration::ContextRegistration<
 		 registration::CorrespondenceEstimator<float>,
 		 registration::CovarianceEstimator<float>
-		> reg(tf_out);
+		> reg;
 	
 		return reg.register_scene(new_scene, map, tf_out);
 	}
