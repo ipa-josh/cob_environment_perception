@@ -143,6 +143,8 @@ namespace cob_3d_visualization {
 			nh.param<int>("/simple_marker/"+ns()+"/min", mi, 0);
 			nh.param<int>("/simple_marker/"+ns()+"/max", ma, 0);
 			ROS_INFO("clearing old markers from %d to %d", mi, ma);
+			if(mi>=ma) return;
+			
 			for(; mi<ma; mi++)
 				active_ids_.push_back(S_ACTIVE(mi,""));
 				
