@@ -44,6 +44,30 @@ void GlobalContext::add_scene(const cob_3d_mapping_msgs::PlaneScene &scene, Tran
 	scene_->optimize(scene_);
 }
 
+void GlobalContext::_test__register_scene(const cob_3d_mapping_msgs::PlaneScene &scene, TransformationEstimator * const tf_est)
+{
+	Context::Ptr ctxt = boost::make_shared<Context>();
+	ctxt->add_scene(ctxt, scene);
+	classify(ctxt, true);
+	ctxt->optimize(ctxt);
+	
+	Eigen::Affine3f Te(Eigen::AngleAxisf(0.1, Eigen::Vector3f::UnitX()));
+	std::cout<<"test matrix\n"<<Te.matrix().inverse()<<std::endl;
+	
+	for(std::vector<Object::Ptr>::iterator it=ctxt->begin(); it!=ctxt->end(); it++) {
+		Object3D *obj3d = dynamic_cast<Object3D*>(it->get());
+		obj3d->pose() = cast(Te * cast(obj3d->pose()));
+	}
+	
+	assert(scene_);
+	
+	if(tf_est)
+		if(!tf_est->register_scene(ctxt, scene_, tf)) {
+			ROS_WARN("failed to register scene --> SKIPPING!");
+			return;
+		}
+}
+
 bool GlobalContext::registerClassifier(Classifier *c) {
 	assert(c);
 	

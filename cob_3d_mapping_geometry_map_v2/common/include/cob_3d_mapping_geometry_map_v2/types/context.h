@@ -182,6 +182,8 @@ public:
 	GlobalContext();
 	
 	void add_scene(const cob_3d_mapping_msgs::PlaneScene &, TransformationEstimator * const tf_est);
+	//test functions to be called after add_scene
+	void _test__register_scene(const cob_3d_mapping_msgs::PlaneScene &scene, TransformationEstimator * const tf_est);
 	
 	void visualize_markers();
 	
