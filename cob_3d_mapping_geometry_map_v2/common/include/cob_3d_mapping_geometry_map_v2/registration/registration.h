@@ -52,18 +52,30 @@ public:
 	typedef _Scalar Scalar;
 	typedef Eigen::Matrix<Scalar, 4, 1> Vector4;
 	typedef Eigen::Matrix<Scalar, 3, 3> Matrix3;
+	typedef std::vector<Eigen::Matrix<Scalar, 4, 1> > List_Vector4;
+	typedef std::vector<Eigen::Matrix<Scalar, 3, 3> > List_Matrix3;
 	
-	CovarianceEstimator(Object::ConstPtr obj) {
-		cov_ = Matrix3::Zero();
-		pt_  = Vector4::Zero();
-		pt_(3) = 1.0;
+	CovarianceEstimator(Object::ConstPtr obj, Object::ConstPtr rel) {
+		if(!_compute(cov_,pt_,obj) || !_compute(cov_rel_,pt_rel_,rel)) {
+			cov_.clear();
+			pt_.clear();
+			cov_rel_.clear();
+			pt_rel_.clear();
+		}
 		
+		assert(cov_.size()==cov_rel_.size());
+		assert(cov_.size()==pt_.size());
+		assert(pt_.size()==pt_rel_.size());
+	}
+	
+	bool _compute(List_Matrix3 &cov, List_Vector4 &pt, Object::ConstPtr obj) {
 		const ObjectVolume *vol = dynamic_cast<const ObjectVolume*>(obj.get());
-		if(!vol) return;
+		if(!vol) return false;
 		
 		ObjectVolume::TBB bb = vol->bb_in_pose();
 		Eigen::Affine3f aff = cast(vol->pose());
-		pt_.template head<3>() = (aff*((bb.min()+bb.max())/2)).cast<Scalar>();
+		pt = List_Vector4(1, Vector4::Unit(3));
+		pt[0].template head<3>() = (aff*((bb.min()+bb.max())/2)).cast<Scalar>();
 		
 		ObjectVolume::TBB::VectorType tl = bb.corner( ObjectVolume::TBB::CornerType::TopLeft );
 		ObjectVolume::TBB::VectorType tr = bb.corner( ObjectVolume::TBB::CornerType::TopRight );
@@ -80,19 +92,24 @@ public:
 		T.col(2) = tmp.col(2) + 0.01*stableNormalized(tmp.col(0).cross(tmp.col(1)));
 		
 		
-		cov_ = (aff.rotation()*(T*T.transpose())*aff.rotation().transpose()).cast<Scalar>();
+		cov = List_Matrix3(1, (aff.rotation()*(T*T.transpose())*aff.rotation().transpose()).cast<Scalar>());
 		
 		/*Eigen::Matrix3f T = Eigen::Matrix3f::Identity();
 		T(2,2) = 0.001;
 		cov_ = (aff.rotation()*T*aff.rotation().transpose()).cast<Scalar>();*/
+		
+		return true;
 	}
 	
-	inline Matrix3 cov() const {return cov_;}
-	inline Vector4 pt() const {return pt_;}
+	inline const List_Matrix3 &cov() const {return cov_;}
+	inline const List_Vector4 &pt() const {return pt_;}
+	
+	inline const List_Matrix3 &cov_rel() const {return cov_rel_;}
+	inline const List_Vector4 &pt_rel() const {return pt_rel_;}
 	
 protected:
-	Matrix3 cov_;
-	Vector4 pt_;
+	List_Matrix3 cov_, cov_rel_;
+	List_Vector4 pt_, pt_rel_;
 };
 
 template<class Scalar=float>
@@ -394,8 +411,6 @@ public:
 		
 		while(!converged_) {
 			mahalanobis.clear();
-			size_t cnt = 0;
-			std::vector<int> source_indices, target_indices;
 			const Matrix3 R = transformation.template topLeftCorner<3,3>(); //rotational part
 			std::vector<Vector4> pt_src, pt_tgt;
 			
@@ -403,27 +418,22 @@ public:
 				//find correspondences
 				std::vector<int> cors_idx;
 				estimator.findCorrespondences(src[i], tgt, transformation.inverse(), cors_idx);
-				mahalanobis.resize (mahalanobis.size()+cors_idx.size(), Matrix3::Identity ());
-				source_indices.resize(source_indices.size()+cors_idx.size());
-				target_indices.resize(target_indices.size()+cors_idx.size());
 				
-				CovarianceGen cgen1(src[i]);
-				const Matrix3 &C1 = cgen1.cov();
 				for(size_t j=0; j<cors_idx.size(); j++) {					
-					CovarianceGen cgen2(tgt[cors_idx[j]]);
-					const Matrix3 &C2 = cgen2.cov();
-					Matrix3 &M = mahalanobis[cnt];
-					M = R * C1;
-					// temp = M*R' + C2 = R*C1*R' + C2
-					Matrix3 temp = M * R.transpose();
-					temp+= C2;
-					M = temp.inverse ();
-					source_indices[cnt] = static_cast<int> (i);
-					target_indices[cnt] = cors_idx[j];
-					cnt++;
+					CovarianceGen cgen(tgt[cors_idx[j]], src[i]);
 					
-					pt_src.push_back(cgen1.pt());
-					pt_tgt.push_back(cgen2.pt());
+					assert(cgen.cov().size()==cgen.cov_rel().size());
+					assert(cgen.pt().size()==cgen.pt_rel().size());
+				
+					for(size_t k=0; k<cgen.pt().size(); k++) {
+						const Matrix3 &C1 = cgen.cov_rel()[k];
+						const Matrix3 &C2 = cgen.cov()[k];
+						// temp = M*R' + C2 = R*C1*R' + C2
+						mahalanobis.push_back( (R * C1 * R.transpose() + C2).inverse () );
+						
+						pt_src.push_back(cgen.pt_rel()[k]);
+						pt_tgt.push_back(cgen.pt()[k]);
+					}
 				}
 			}
 			
