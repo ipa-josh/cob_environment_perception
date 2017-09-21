@@ -65,21 +65,26 @@ public:
 		Eigen::Affine3f aff = cast(vol->pose());
 		pt_.template head<3>() = (aff*((bb.min()+bb.max())/2)).cast<Scalar>();
 		
-		/*ObjectVolume::TBB::VectorType tl = bb.corner( ObjectVolume::TBB::CornerType::TopLeft );
+		ObjectVolume::TBB::VectorType tl = bb.corner( ObjectVolume::TBB::CornerType::TopLeft );
 		ObjectVolume::TBB::VectorType tr = bb.corner( ObjectVolume::TBB::CornerType::TopRight );
 		ObjectVolume::TBB::VectorType bl = bb.corner( ObjectVolume::TBB::CornerType::BottomLeft );
 		ObjectVolume::TBB::VectorType tlf = bb.corner( ObjectVolume::TBB::CornerType::TopLeftFloor );
 		
-		Eigen::Matrix3f T;
-		T.col(0) = 0.5*(tr-tl);
-		T.col(1) = 0.5*(bl-tl);
-		T.col(2) = 0.5*(tlf-tl);
+		Eigen::Matrix3f tmp, T;
+		tmp.col(0) = 0.5*(tr-tl);
+		tmp.col(1) = 0.5*(bl-tl);
+		tmp.col(2) = 0.5*(tlf-tl);
 		
-		cov_ = (aff*(T*T.transpose())).cast<Scalar>();*/
+		T.col(0) = tmp.col(0) + 0.01*stableNormalized(tmp.col(1).cross(tmp.col(2)));
+		T.col(1) = tmp.col(1) + 0.01*stableNormalized(tmp.col(2).cross(tmp.col(0)));
+		T.col(2) = tmp.col(2) + 0.01*stableNormalized(tmp.col(0).cross(tmp.col(1)));
 		
-		Eigen::Matrix3f T = Eigen::Matrix3f::Identity();
+		
+		cov_ = (aff.rotation()*(T*T.transpose())*aff.rotation().transpose()).cast<Scalar>();
+		
+		/*Eigen::Matrix3f T = Eigen::Matrix3f::Identity();
 		T(2,2) = 0.001;
-		cov_ = (aff.rotation()*T*aff.rotation().transpose()).cast<Scalar>();
+		cov_ = (aff.rotation()*T*aff.rotation().transpose()).cast<Scalar>();*/
 	}
 	
 	inline Matrix3 cov() const {return cov_;}

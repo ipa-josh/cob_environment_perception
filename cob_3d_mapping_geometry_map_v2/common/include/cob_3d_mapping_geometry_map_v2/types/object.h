@@ -18,7 +18,14 @@ class Context;
 class Class;
 namespace Visualization {class Object;}
 
-
+	
+template<class T>
+inline T stableNormalized(const T &v) {
+	auto l = v.squaredNorm();
+	if(l<0.000001) return T::Zero(); //ls is always positive for non-imaginary numbers
+	return v/std::sqrt(l);
+}
+	
 template<class T>
 inline nuklei_wmf::Vector3<double> cast(const Eigen::Matrix<T,3,1> &v) {
 	return nuklei_wmf::Vector3<double>(v(0), v(1), v(2));

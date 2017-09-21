@@ -61,6 +61,7 @@ void GlobalContext::_test__register_scene(const cob_3d_mapping_msgs::PlaneScene 
 	
 	assert(scene_);
 	
+	nuklei::kernel::se3 tf;
 	if(tf_est)
 		if(!tf_est->register_scene(ctxt, scene_, tf)) {
 			ROS_WARN("failed to register scene --> SKIPPING!");
